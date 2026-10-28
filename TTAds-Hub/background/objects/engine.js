@@ -3,10 +3,11 @@
 import { ORIGIN } from '../lib/constants.js';
 import { HubError, runInPageGuarded, wait } from '../lib/page.js';
 import { log } from '../lib/storage.js';
+import { classifyError, isSuccess } from '../lib/errors.js';
 import { keepAlive } from '../lib/tabs.js';
 import * as accountsEngine from '../accounts/engine.js';
-import { ID_RE, LEVELS, readiness, variantFor, buildRequest, renderName, budgetAfter, maskBody } from './contract.js';
-import { getContracts, clearContracts, getSession, getJob, setJob, pickAdsTab, readRows, stateOf } from './store.js';
+import { ID_RE, LEVELS, INVALID_REASONS, readiness, contractInfo, contractStates, locate, variantFor, buildRequest, renderName, budgetAfter, maskBody } from './contract.js';
+import { getContracts, clearContracts, invalidateVariant, getSession, getJob, setJob, pickAdsTab, readRows, stateOf } from './store.js';
 import { replayMutationInPage } from './page-scripts.js';
 
 const ACTIONS = ['disable', 'enable', 'rename', 'budget'];
@@ -16,6 +17,8 @@ const ACTION_TITLE = { disable: 'выключить', enable: 'включить'
 const MAX_ITEMS = 300;
 const MAX_ACCOUNTS = 50;
 const CONCURRENCY = 3;
+// Паузы между повторами (мс): сбой сети или сервера и лимит запросов. Автотесты сокращают их через globalThis.__tth.objects.RETRY.
+export const RETRY = { transient: [2000, 6000], rate: [15000, 45000] };
 let active = null;
 
 function normalize(input = {}) {
@@ -84,12 +87,21 @@ async function resolveTargets(plan) {
 
 const noContract = (plan) => new HubError(`Расширение ещё не знает, как ${ACTION_TITLE[plan.action]} ${LEVEL_TITLE[plan.level]} в этой версии TikTok. Обучите действие: выполните его один раз в TikTok на тестовом объекте.`, 'no_contract');
 
+function contractError(plan, store) {
+  const info = contractInfo(store, plan.level, plan.action);
+  if (info.state === 'invalid') {
+    return new HubError(`Запомненное действие отключено: ${INVALID_REASONS[info.reason] || 'TikTok изменил запрос'}. Обучите «${ACTION_TITLE[plan.action]} ${LEVEL_TITLE[plan.level]}» заново.`, 'no_contract');
+  }
+  return noContract(plan);
+}
+
 export async function plan(input) {
   const p = normalize(input);
-  const variant = variantFor(await getContracts(), p.level, p.action);
+  const store = await getContracts();
+  const variant = variantFor(store, p.level, p.action);
   const entries = await resolveTargets(p);
   return {
-    action: p.action, level: p.level, ready: Boolean(variant),
+    action: p.action, level: p.level, ready: Boolean(variant), contract: contractInfo(store, p.level, p.action),
     accounts: entries.map((entry) => ({
       id: entry.id, name: entry.name, currency: entry.currency, total: entry.total, targets: entry.items.length, skipped: entry.skipped, error: entry.error, truncated: entry.truncated,
       sample: entry.items.slice(0, 5).map(({ id, name, before, after }) => ({ id, name, before, after }))
@@ -107,66 +119,136 @@ const confirmed = (action, row, item) => {
   return Math.abs(row.budget - item.after.budget) < 0.01;
 };
 
+// Чтение одного объекта перед повтором: общий кэш на 1 с, чтобы параллельные повторы не перечитывали кабинет каждый раз.
+const rowCache = new Map();
+async function freshRow(account, level, id, tabId) {
+  const hit = rowCache.get(account);
+  let rows = hit && Date.now() - hit.at < 1000 ? hit.rows : null;
+  if (!rows) { rows = (await readRows(account, level, tabId)).rows; rowCache.set(account, { at: Date.now(), rows }); }
+  return rows.find((row) => row.id === id) || null;
+}
+
+const classify = (result) => classifyError({ http: result?.http, code: result?.code, msg: result?.msg, error: result?.error, lost: result?.lost });
+
 async function run(job) {
   const release = keepAlive();
   try {
-    const variant = variantFor(await getContracts(), job.level, job.action);
-    if (!variant) throw noContract(job);
+    const store = await getContracts();
+    const variant = variantFor(store, job.level, job.action);
+    if (!variant) throw contractError(job, store);
     const tab = await pickAdsTab();
     const queue = job.items.map((_, index) => index);
-    let streak = 0, successes = 0, aborted = '';
+    const run = { successes: 0, streak: 0, validations: 0, aborted: '', invalidate: '', cooldownUntil: 0 };
+    const kinds = {};
+
+    const attempt = async (item) => {
+      try {
+        const request = buildRequest(variant, { aadvid: item.aadvid, id: item.id, value: item.after?.name ?? item.after?.budget });
+        return await runInPageGuarded(tab.id, replayMutationInPage, [{ ...request, timeoutMs: 15000 }], { stayOn: `${ORIGIN}/`, timeoutMs: 30000 });
+      } catch (error) {
+        return { error: String(error?.message || error).slice(0, 200) };
+      }
+    };
+
+    // Один объект: запрос, при сбое сети/сервера/лимите — повтор с паузой, но только если объект ещё не изменён.
+    const send = async (item) => {
+      let result, info = null, tries = 0;
+      for (;;) {
+        const pause = run.cooldownUntil - Date.now();
+        if (pause > 0) await wait(pause);
+        if (active?.cancel || run.aborted) { result = result || { error: 'остановлено' }; break; }
+        result = await attempt(item);
+        tries += 1;
+        if (isSuccess(result)) break;
+        info = classify(result);
+        const schedule = info.kind === 'rate' ? RETRY.rate : info.retryable ? RETRY.transient : null;
+        if (!schedule || tries > schedule.length) break;
+        const delay = schedule[tries - 1] + Math.round(Math.random() * 250);
+        if (info.kind === 'rate') run.cooldownUntil = Math.max(run.cooldownUntil, Date.now() + delay);
+        await wait(delay);
+        const row = await freshRow(item.aadvid, job.level, item.id, tab.id).catch(() => null);
+        if (row && confirmed(job.action, row, item)) { result = { http: 200, code: 0, late: true }; break; }
+      }
+      const ok = isSuccess(result);
+      if (!ok && !info) info = classify(result);
+      item.request = {
+        ok, http: result?.http ?? null, code: result?.code ?? null, tries, late: Boolean(result?.late), kind: ok ? '' : info.kind,
+        msg: result?.msg || result?.error || (result?.lost ? 'вкладка TikTok недоступна' : '')
+      };
+      job.done += 1;
+      if (ok) { run.successes += 1; run.streak = 0; run.validations = 0; return ok; }
+      job.failed += 1; run.streak += 1;
+      kinds[info.kind] = (kinds[info.kind] || 0) + 1;
+      // Сессия, проверка личности и смена адреса запроса затрагивают все объекты — дальше не идём. Остальное — если с самого начала нет ни одного успеха.
+      if (info.kind === 'auth' || info.kind === 'verification') run.aborted ||= info.hint;
+      else if (info.kind === 'schema') { run.aborted ||= info.hint; run.invalidate ||= 'schema'; }
+      else if (info.kind === 'validation') {
+        run.validations += 1;
+        if (!run.successes && run.validations >= 3) { run.aborted ||= info.hint; run.invalidate ||= 'validation'; }
+      } else if (!run.successes && run.streak >= 3) run.aborted ||= item.request.msg || info.hint || 'TikTok отклоняет запрос';
+      return ok;
+    };
+
     const worker = async () => {
-      while (queue.length && !active?.cancel && !aborted) {
+      while (queue.length && !active?.cancel && !run.aborted) {
         const item = job.items[queue.shift()];
-        let result;
-        try {
-          const request = buildRequest(variant, { aadvid: item.aadvid, id: item.id, value: item.after?.name ?? item.after?.budget });
-          result = await runInPageGuarded(tab.id, replayMutationInPage, [{ ...request, timeoutMs: 15000 }], { stayOn: `${ORIGIN}/`, timeoutMs: 30000 });
-        } catch (error) {
-          result = { error: String(error?.message || error).slice(0, 200) };
-        }
-        const ok = Boolean(result) && !result.error && !result.lost && result.http === 200 && result.code === 0;
-        item.request = { ok, http: result?.http ?? null, code: result?.code ?? null, msg: result?.msg || result?.error || (result?.lost ? 'вкладка TikTok недоступна' : '') };
-        job.done += 1;
-        if (ok) { successes += 1; streak = 0; } else {
-          job.failed += 1; streak += 1;
-          // Если TikTok отклоняет запрос с самого начала, остальные не отправляем: так не засоряем журнал и не нагружаем аккаунт.
-          if (!successes && streak >= 3) aborted = item.request.msg || 'TikTok отклоняет запрос';
-        }
+        const ok = await send(item);
         if (job.done % 5 === 0 || !ok) await saveJob(job);
         await wait(120);
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-    for (const item of job.items) if (!item.request) item.request = { ok: false, skipped: true, msg: aborted ? `пропущено: ${aborted}` : 'остановлено' };
+    for (const item of job.items) if (!item.request) item.request = { ok: false, skipped: true, msg: run.aborted ? `пропущено: ${run.aborted}` : 'остановлено' };
+    job.errorKinds = kinds;
 
+    // Результат подтверждается только повторным чтением — и для запросов с потерянным ответом тоже: изменение могло примениться.
     job.phase = 'verify';
     await saveJob(job);
-    await wait(1200);
     const byAccount = new Map();
     for (const item of job.items) byAccount.set(item.aadvid, [...(byAccount.get(item.aadvid) || []), item]);
-    for (const [account, items] of byAccount) {
-      try {
-        const { rows } = await readRows(account, job.level, tab.id);
-        const map = new Map(rows.map((row) => [row.id, row]));
-        for (const item of items) {
-          const row = map.get(item.id);
-          item.now = row ? stateOf(row) : null;
-          item.verified = item.request.ok && row ? confirmed(job.action, row, item) : false;
+    const verifyAll = async () => {
+      job.note = '';
+      for (const [account, items] of byAccount) {
+        try {
+          const { rows } = await readRows(account, job.level, tab.id);
+          const map = new Map(rows.map((row) => [row.id, row]));
+          for (const item of items) {
+            const row = map.get(item.id);
+            item.now = row ? stateOf(row) : null;
+            item.verified = row ? confirmed(job.action, row, item) : false;
+          }
+        } catch (error) {
+          job.note = `Не удалось перечитать кабинет ${account}: ${String(error?.message || error).slice(0, 120)}`;
+          for (const item of items) item.verified = null;
         }
-      } catch (error) {
-        job.note = `Не удалось перечитать кабинет ${account}: ${String(error?.message || error).slice(0, 120)}`;
-        for (const item of items) item.verified = null;
       }
+      return job.items.filter((item) => item.verified === true).length;
+    };
+    await wait(1200);
+    let verified = await verifyAll();
+    // TikTok ответил «ок» трижды и более, а объекты не изменились: даём списку время обновиться и проверяем ещё раз.
+    if (run.successes >= 3 && verified === 0 && !job.note) {
+      await wait(4000);
+      verified = await verifyAll();
+      if (verified === 0 && !job.note) run.invalidate ||= 'no-effect';
     }
-    const verified = job.items.filter((item) => item.verified === true).length;
+    for (const item of job.items) {
+      if (!item.request.ok && !item.request.skipped && item.verified === true) { item.request.ok = true; item.request.late = true; job.failed -= 1; }
+    }
     job.verified = verified;
     job.state = active?.cancel ? 'cancelled' : verified === job.total ? 'complete' : verified ? 'partial' : 'error';
-    if (aborted) job.error = aborted;
+    if (run.aborted) job.error = run.aborted;
+    if (run.invalidate) {
+      const where = locate(job.level, job.action);
+      if (where) await invalidateVariant(where.endpoint, where.key, run.invalidate);
+      job.invalidated = run.invalidate;
+      job.error = `${INVALID_REASONS[run.invalidate]}. Запомненное действие отключено: обучите его заново (Настройки → «Обучить действия»).`;
+    }
     job.phase = null;
     job.completedAt = Date.now();
     await saveJob(job);
-    log(job.state === 'complete' ? 'info' : 'warn', 'objects', `${ACTION_TITLE[job.action]} (${LEVEL_TITLE[job.level]}): подтверждено ${verified} из ${job.total} в ${byAccount.size} РК — ${job.state}${job.rollbackOf ? ' (откат)' : ''}`);
+    const retried = job.items.reduce((sum, item) => sum + Math.max(0, (item.request?.tries || 1) - 1), 0);
+    log(job.state === 'complete' ? 'info' : 'warn', 'objects', `${ACTION_TITLE[job.action]} (${LEVEL_TITLE[job.level]}): подтверждено ${verified} из ${job.total} в ${byAccount.size} РК${retried ? `, повторов: ${retried}` : ''}${run.invalidate ? `, контракт отключён (${run.invalidate})` : ''} — ${job.state}${job.rollbackOf ? ' (откат)' : ''}`);
   } catch (error) {
     job.state = 'error';
     job.error = String(error?.message || error).slice(0, 300);
@@ -193,7 +275,8 @@ export async function apply(input) {
   if (['enable', 'budget'].includes(p.action) && !p.confirmSpend) throw new HubError('Включение и бюджет могут увеличить расход — подтвердите действие.');
   const session = await getSession();
   if (session?.state === 'waiting' && Date.now() < session.expiresAt) throw new HubError('Идёт обучение действия — завершите или остановите его.');
-  if (!variantFor(await getContracts(), p.level, p.action)) throw noContract(p);
+  const store = await getContracts();
+  if (!variantFor(store, p.level, p.action)) throw contractError(p, store);
   const entries = await resolveTargets(p);
   const items = entries.flatMap((entry) => entry.items);
   if (!items.length) throw new HubError(entries.find((entry) => entry.error)?.error || 'Менять нечего: объекты уже в нужном состоянии или не подходят под фильтр.');
@@ -208,7 +291,7 @@ export async function rollback() {
   const changed = job.items.filter((item) => item.verified === true);
   if (!changed.length) throw new HubError('В последней операции нет подтверждённых изменений.');
   const action = INVERSE[job.action];
-  if (!variantFor(await getContracts(), job.level, action)) throw new HubError(`Для отката нужно обучить обратное действие: ${ACTION_TITLE[action]} ${LEVEL_TITLE[job.level]}.`, 'no_contract');
+  if (!variantFor(await getContracts(), job.level, action)) throw new HubError(`Для отката нужно обучить обратное действие: ${ACTION_TITLE[action]} ${LEVEL_TITLE[job.level]} (или оно отключено после сбоя).`, 'no_contract');
   const back = (item) => (job.action === 'rename' ? { name: item.before.name } : job.action === 'budget' ? { budget: item.before.budget } : { enabled: item.before.enabled });
   const items = changed.map((item) => ({ aadvid: item.aadvid, id: item.id, name: item.now?.name || item.name, before: item.now || item.after, after: back(item) }));
   return startJob({ action, level: job.level, items, accounts: job.accounts, rollbackOf: job.id });
@@ -228,6 +311,7 @@ export async function status() {
   const session = await getSession();
   return {
     ready: readiness(await getContracts()),
+    contracts: contractStates(await getContracts()),
     session: session?.state === 'waiting' && Date.now() > session.expiresAt ? { ...session, state: 'expired' } : session,
     job: await jobStatus()
   };
@@ -241,7 +325,7 @@ export async function diagnostics() {
     contracts[id] = {
       updatedAt: entry.updatedAt,
       variants: Object.fromEntries(Object.entries(entry.variants || {}).map(([key, variant]) => [key, {
-        at: variant.at, path: variant.path, query: variant.query, headers: Object.keys(variant.headers || {}), riskInfo: variant.riskInfo, slot: variant.slot, body: maskBody(variant.body)
+        at: variant.at, extVersion: variant.extVersion, invalid: variant.invalid || null, path: variant.path, query: variant.query, headers: Object.keys(variant.headers || {}), riskInfo: variant.riskInfo, slot: variant.slot, body: maskBody(variant.body)
       }]))
     };
   }
@@ -250,7 +334,7 @@ export async function diagnostics() {
   return {
     contracts,
     session: session ? { state: session.state, level: session.level, kind: session.kind, message: session.message, other: session.other || [] } : null,
-    job: job ? { action: job.action, level: job.level, state: job.state, total: job.total, verified: job.verified, error: job.error || '', failedMessages: [...new Set(job.items.filter((item) => item.request && !item.request.ok).map((item) => `${item.request.http ?? ''} ${item.request.code ?? ''} ${item.request.msg}`.trim()))].slice(0, 5) } : null
+    job: job ? { action: job.action, level: job.level, state: job.state, total: job.total, verified: job.verified, error: job.error || '', errorKinds: job.errorKinds || {}, invalidated: job.invalidated || null, failedMessages: [...new Set(job.items.filter((item) => item.request && !item.request.ok).map((item) => `${item.request.kind || ''} ${item.request.http ?? ''} ${item.request.code ?? ''} ${item.request.msg}`.trim()))].slice(0, 5) } : null
   };
 }
 
