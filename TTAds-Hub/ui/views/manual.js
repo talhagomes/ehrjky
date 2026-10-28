@@ -64,12 +64,15 @@ export function mountManual(root, ctx) {
     }
     if (s.lastError) return { kind: 'error', title: 'Не удалось переключить', text: s.lastError, action: s.canActivate ? { label: 'Повторить', icon: 'refresh', run: onActivate } : null };
     if (local.error) return { kind: 'error', title: 'Не удалось переключить', text: local.error, action: s.canActivate ? { label: 'Повторить', icon: 'refresh', run: onActivate } : null };
-    if (s.draft && s.manual?.shown) return { kind: 'done', title: 'Manual активен', text: `Черновик ${s.draft.slice(-8)}${goal ? ' · ' + goal : ''}. Продолжайте настройку кампании.` };
+    if (s.draft && s.manual?.shown) return {
+      kind: 'done', title: 'Manual активен',
+      text: `${s.manual.mode === 'unified' ? 'Smart+ выключен · ' : ''}черновик ${s.draft.slice(-8)}${goal ? ' · ' + goal : ''}. Продолжайте настройку кампании.`
+    };
     if (s.draft && s.manual?.present) return { kind: 'ready', title: 'Manual уже в черновике', text: 'Нажмите, чтобы открыть ручной вариант в редакторе.', action: { label: 'Показать Manual', icon: 'zap', run: onActivate } };
     if (s.canActivate) {
       return {
         kind: 'ready', title: goal ? `Цель: ${goal}` : 'Готово к переключению',
-        text: s.canCreate ? 'Расширение подтвердит окно создания и переключит новый черновик на Manual.' : 'Черновик откроется заново в ручном режиме — несохранённые правки лучше сохранить.',
+        text: s.canCreate ? 'Расширение продолжит создание и отключит Smart+ в новом черновике.' : s.manual?.smartPlus ? 'Smart+ будет отключён через сохранение черновика; страница затем проверит custom mode.' : 'Черновик откроется заново в ручном режиме — несохранённые правки лучше сохранить.',
         action: { label: 'Включить Manual', icon: 'zap', run: onActivate }
       };
     }

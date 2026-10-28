@@ -107,7 +107,15 @@ async function completeCapture(capture) {
     learnedKinds.set(String(form.objective_type), kind);
     await sdel(armedKey);
     const result = await applyCaptured(tabId, capture, kind);
-    if (result?.error) await setError(tabId, result.error);
+    if (result?.error) {
+      // API-first: если TikTok сменил контракт save/replay, новый unified editor всё ещё позволяет
+      // безопасно выключить Smart+ в текущем черновике без открытия новой страницы.
+      const fallback = await inspectView(tabId, { account: capture.account, draft, objective: kind }, true).catch(() => null);
+      if (fallback?.shown) {
+        await sdel(key('error', tabId));
+        log('warn', 'manual', `API переключения изменился; Manual включён через unified Smart+ switch (${result.error})`);
+      } else await setError(tabId, result.error);
+    }
   } catch (e) {
     await sdel(armedKey);
     await setError(tabId, e.message || 'Не удалось переключить на Manual.');
@@ -311,7 +319,10 @@ export async function getState(tabId, tabUrl) {
   const onDraftPage = Boolean(draft && info.path.endsWith('/create/campaign'));
   let manual = null;
   if (onDraftPage && !busyTabs.has(tabId) && !activatingTabs.has(tabId)) {
-    try { const v = await inspectView(tabId, { account, draft }, false); if (!v.error) manual = { present: Boolean(v.manual), shown: Boolean(v.shown) }; } catch { /* страница меняется */ }
+    try {
+      const v = await inspectView(tabId, { account, draft }, false);
+      if (!v.error) manual = { present: Boolean(v.manual), shown: Boolean(v.shown), mode: v.mode || 'legacy', smartPlus: v.smartPlus === true };
+    } catch { /* страница меняется */ }
   }
   const view = values[key('view', tabId)];
   const viewPending = Boolean(view && view.account === account && view.draft === draft && view.expires >= Date.now());
@@ -363,7 +374,15 @@ async function startActivation(tabId, tabUrl) {
     await sdel(key('armed', tabId));
     try {
       const result = await applyCaptured(tabId, capture);
-      if (result?.error) await setError(tabId, result.error);
+      if (result?.error) {
+        const fallback = await inspectView(tabId, { account: state.account, draft: state.draft }, true).catch(() => null);
+        if (fallback?.shown) {
+          await sdel(key('error', tabId));
+          log('warn', 'manual', `API переключения изменился; Manual включён через unified Smart+ switch (${result.error})`);
+          return { ok: true, shown: true, fallback: 'unified-dom', apiError: result.error };
+        }
+        await setError(tabId, result.error);
+      }
       return result;
     } catch (e) { await setError(tabId, e.message); return { error: e.message }; } finally { busyTabs.delete(tabId); }
   }

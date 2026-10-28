@@ -7,8 +7,21 @@ export function selectedGoal() {
     const r = e.getBoundingClientRect(), s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
   };
+  const goalFrom = (raw) => {
+    const text = String(raw || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (/^app promotion\b/.test(text)) return 'app';
+    if (/^lead generation\b/.test(text)) return 'lead';
+    if (/^sales\b/.test(text)) return 'sales';
+    return null;
+  };
+  // Новый unified editor (октябрь 2026): objective — обычный aria-radio без data-cs-name.
+  for (const e of document.querySelectorAll('.campaign-objective [role="radio"][aria-checked="true"], [data-testid^="new-objective-selection-"][role="radio"][aria-checked="true"]')) {
+    if (!visible(e)) continue;
+    const goal = goalFrom(e.textContent);
+    if (goal) return goal;
+  }
   const title = (e) => ((e.querySelector('.cs-campaign-option__title .truncate,.cs-campaign-option__title') || e).textContent || '').trim().toLowerCase();
-  for (const e of document.querySelectorAll('.cs-campaign-option[data-cs-selected="true"]')) {
+  for (const e of document.querySelectorAll('.cs-campaign-option[data-cs-selected="true"],.cs-objective-option[data-cs-selected="true"]')) {
     if (!visible(e)) continue;
     const n = (e.getAttribute('data-cs-name') || '').replace(/[\s_-]/g, '').toLowerCase(), t = title(e);
     if (n === 'apppromotion' || t === 'app promotion') return 'app';
@@ -18,8 +31,8 @@ export function selectedGoal() {
   return null;
 }
 
-// Проверяет (и при click=true открывает) отображение Manual-кампании в редакторе черновика.
-// Возвращает { manual, shown } либо { error }.
+// Проверяет (и при click=true открывает) Manual/custom mode в legacy и unified editor.
+// В unified flow Manual означает выключенный переключатель «Power your campaign with Smart+».
 export async function manualView(ctx, click) {
   const onDraft = () => {
     const u = new URL(location.href);
@@ -34,16 +47,34 @@ export async function manualView(ctx, click) {
   const deadline = Date.now() + (click ? 25000 : 0);
   do {
     if (!onDraft()) return { error: 'Вкладка переключилась на другой черновик.' };
+    const smartSwitch = Array.from(document.querySelectorAll('[role="switch"]')).find((e) => {
+      if (!visible(e)) return false;
+      let parent = e;
+      for (let depth = 0; parent && depth < 5; depth += 1, parent = parent.parentElement) {
+        if (/Power your campaign with Smart\+/i.test(parent.textContent || '')) return true;
+      }
+      return false;
+    });
+    if (smartSwitch) {
+      const input = smartSwitch.matches('input') ? smartSwitch : smartSwitch.querySelector('input[type="checkbox"]');
+      const enabled = Boolean(input?.checked || smartSwitch.getAttribute('aria-checked') === 'true' || smartSwitch.classList.contains('is-checked'));
+      if (!enabled) return { manual: true, shown: true, mode: 'unified', smartPlus: false, clicked };
+      if (!click) return { manual: false, shown: false, mode: 'unified', smartPlus: true };
+      if (!clicked && smartSwitch.getAttribute('aria-disabled') !== 'true' && input?.disabled !== true) {
+        (smartSwitch.querySelector('.vi-switch__core') || smartSwitch).click();
+        clicked = true;
+      }
+    }
     const selected = Array.from(document.querySelectorAll('[data-cs-name][data-cs-selected="true"], [role="radio"][aria-checked="true"]')).find((e) => {
       const t = e.querySelector('.cs-campaign-option__title');
       const text = ((t?.querySelector('.truncate') || t)?.textContent || e.textContent).trim();
       return visible(e) && (/_Manual$/i.test(e.getAttribute('data-cs-name') || '') ||
         /^(Chiến dịch thủ công|Manual campaign|Ручная кампания)(?:\s|$)/i.test(text));
     });
-    if (selected) return { manual: true, shown: true };
+    if (selected) return { manual: true, shown: true, mode: 'legacy' };
     const label = Array.from(document.querySelectorAll('[data-testid="lego-hybrid-section-item-displayText"]'))
       .find((e) => visible(e) && /\(\s*(?:Manual|Thủ công|Ручн\S*|Вручную)\s*\)/i.test(e.textContent));
-    if (!click) return { manual: Boolean(label), shown: false };
+    if (!click && !smartSwitch) return { manual: Boolean(label), shown: false, mode: 'legacy' };
     const op = label?.parentElement?.querySelector('[data-testid="lego-hybrid-section-item-operation"]');
     if (!clicked && op && visible(op) && op.disabled !== true && !op.hasAttribute('disabled') && op.getAttribute('aria-disabled') !== 'true') {
       op.click();
@@ -51,7 +82,7 @@ export async function manualView(ctx, click) {
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   } while (Date.now() < deadline);
-  return { error: 'Не удалось открыть Manual-вариант. Нажмите кнопку ещё раз.' };
+  return { error: 'Не удалось включить Manual/custom mode. TikTok не подтвердил отключение Smart+.' };
 }
 
 // Окно выбора цели кампании: определяет цель и (при click=true) нажимает «Confirm» в Shadow DOM.
@@ -59,6 +90,28 @@ export function inspectCreationModal(account, click, expected) {
   const u = new URL(location.href);
   if (u.origin !== 'https://ads.tiktok.com' || u.searchParams.get('aadvid') !== account || u.searchParams.has('campaign_draft_id')) {
     return { eligible: false, error: 'Другой кабинет или черновик уже открыт.' };
+  }
+  const visible = (e) => {
+    const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+  };
+  const goalFrom = (raw) => {
+    const text = String(raw || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (/^app promotion\b/.test(text)) return 'app';
+    if (/^lead generation\b/.test(text)) return 'lead';
+    if (/^sales\b/.test(text)) return 'sales';
+    return null;
+  };
+  // Новый full-page unified editor: после Create нет Shadow DOM modal, цель и Continue уже на странице.
+  const unified = Array.from(document.querySelectorAll('.campaign-objective [role="radio"][aria-checked="true"], [data-testid^="new-objective-selection-"][role="radio"][aria-checked="true"]'))
+    .find((e) => visible(e) && goalFrom(e.textContent));
+  if (unified) {
+    const goal = goalFrom(unified.textContent);
+    if (expected && goal !== expected) return { eligible: false, error: 'Цель изменилась. Откройте панель заново.' };
+    const buttons = Array.from(document.querySelectorAll('button')).filter((e) => visible(e) && !e.disabled && e.getAttribute('aria-disabled') !== 'true' && /^Continue$/i.test(String(e.textContent || '').trim()));
+    if (buttons.length !== 1) return { eligible: false, error: 'Кнопка Continue в новом редакторе TikTok не найдена.' };
+    if (click) buttons[0].click();
+    return { eligible: true, clicked: Boolean(click), objective: goal, mode: 'unified' };
   }
   const title = (e) => ((e.querySelector('.cs-campaign-option__title .truncate,.cs-campaign-option__title') || e).textContent || '').trim().toLowerCase();
   let goal = null, section = null;
