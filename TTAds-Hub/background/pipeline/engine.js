@@ -6,6 +6,7 @@ import * as registry from '../lib/registry.js';
 import { closeTab, focusTab, keepAlive } from '../lib/tabs.js';
 import * as creation from '../creation/engine.js';
 import * as share from '../share/engine.js';
+import * as access from '../access/engine.js';
 import { DEFAULT_NAME_TEMPLATES as DEFAULT_TEMPLATES } from '../lib/constants.js';
 
 const KEY = 'pipelineJob';
@@ -60,6 +61,13 @@ function buildPlan(input = {}, settings) {
       email: text(input.company?.email, 160)
     }
   };
+  const transferInput = input.transfer ?? auto.transfer ?? {};
+  plan.transfer = { enabled: transferInput.enabled === true, targetBusinessCenterId: text(transferInput.targetBusinessCenterId, 30) };
+  if (plan.transfer.enabled) {
+    if (plan.share.enabled) throw new HubError('Выберите одно действие после создания: расшарить или передать владение.');
+    if (!ID.test(plan.transfer.targetBusinessCenterId)) throw new HubError('Укажите ID Business Center, которому передать РК.');
+    if (mode === 'existing-bc' && plan.transfer.targetBusinessCenterId === businessCenterId) throw new HubError('BC получателя совпадает с BC, в котором создаются РК.');
+  }
   if (plan.share.enabled && !plan.share.targets.length) throw new HubError('Укажите ID Business Center, куда расшаривать, или выключите шаринг.');
   if (plan.share.enabled && mode === 'existing-bc' && plan.share.targets.includes(businessCenterId)) {
     throw new HubError('BC получателя совпадает с BC, в котором создаются РК.');
@@ -187,11 +195,52 @@ async function flushShares(job) {
   return 'ok';
 }
 
+// Передача владения созданными РК (self-service transfer): группы по исходному BC, не больше 30 РК в запросе.
+async function flushTransfers(job) {
+  const pending = job.items.filter((item) => item.state === 'created');
+  if (!pending.length) return 'ok';
+  const target = job.plan.transfer.targetBusinessCenterId;
+  const groups = new Map();
+  for (const item of pending) {
+    const bcId = item.result?.businessCenterId || job.plan.businessCenterId;
+    if (!ID.test(bcId) || !ID.test(item.result?.adAccountId || '')) {
+      item.state = 'done';
+      item.transfer = { state: 'error', error: 'TikTok не вернул ID BC/РК — передайте этот кабинет вручную.' };
+      continue;
+    }
+    if (!groups.has(bcId)) groups.set(bcId, []);
+    groups.get(bcId).push(item);
+  }
+  for (const [bcId, items] of groups) {
+    for (let index = 0; index < items.length; index += 30) {
+      const chunk = items.slice(index, index + 30);
+      for (const item of chunk) item.state = 'transferring';
+      job.step = { phase: 'transfer', target };
+      await save(job);
+      const outcome = await access.transfer({ sourceBusinessCenterId: bcId, targetBusinessCenterId: target, accountIds: chunk.map((item) => item.result.adAccountId) })
+        .catch((error) => ({ state: 'error', error: String(error?.message || error).slice(0, 300), results: [] }));
+      const result = outcome.results?.[0] || {};
+      const summary = {
+        state: outcome.state, requested: Boolean(result.success), pending: outcome.state === 'pending',
+        error: outcome.error || result.error || '',
+        hint: result.ineligible ? 'Transfer недоступен этому BC/РК (eligibility TikTok) — используйте шаринг.' : outcome.state === 'needs-user' ? 'Подтвердите transfer во вкладке TikTok.' : ''
+      };
+      for (const item of chunk) { item.transfer = summary; item.state = 'done'; }
+      if (job.plan.closeTabs && outcome.state === 'complete') for (const item of chunk) if (item.tabId) await closeTab(item.tabId);
+      job.step = null;
+      await save(job);
+    }
+  }
+  return 'ok';
+}
+
+const flushHandoff = (job) => (job.plan.transfer?.enabled ? flushTransfers(job) : flushShares(job));
+
 function finish(job) {
   const done = job.items.filter((item) => item.state === 'done');
   const failed = job.items.filter((item) => item.state === 'error');
   const cancelled = job.items.filter((item) => item.state === 'cancelled');
-  const warnings = done.filter((item) => item.payment?.error || (item.share && item.share.state !== 'complete'));
+  const warnings = done.filter((item) => item.payment?.error || (item.share && item.share.state !== 'complete') || (item.transfer && item.transfer.state !== 'complete'));
   job.state = cancelled.length && !failed.length ? 'cancelled'
     : failed.length ? (done.length ? 'partial' : 'error')
       : warnings.length ? 'partial' : 'complete';
@@ -235,13 +284,13 @@ async function run(job) {
       }
       await afterCreated(job, item, created);
       // Для «новый BC + РК» у каждого кабинета свой BC — шарим сразу, переиспользуя вкладку мастера.
-      if (job.plan.mode === 'new-bc' && await flushShares(job) === 'paused') return;
+      if (job.plan.mode === 'new-bc' && await flushHandoff(job) === 'paused') return;
     }
-    if (await flushShares(job) === 'paused') return;
+    if (await flushHandoff(job) === 'paused') return;
     finish(job);
     await save(job);
     const done = job.items.filter((item) => item.state === 'done').length;
-    log(job.state === 'complete' ? 'info' : 'warn', 'create', `Конвейер: создано ${done}/${job.items.length} РК${job.plan.linkPortfolio ? ', Portfolio' : ''}${job.plan.share.enabled ? `, шаринг → ${job.plan.share.targets.join(', ')}` : ''} — ${job.state}`);
+    log(job.state === 'complete' ? 'info' : 'warn', 'create', `Конвейер: создано ${done}/${job.items.length} РК${job.plan.linkPortfolio ? ', Portfolio' : ''}${job.plan.share.enabled ? `, шаринг → ${job.plan.share.targets.join(', ')}` : ''}${job.plan.transfer?.enabled ? `, transfer → ${job.plan.transfer.targetBusinessCenterId}` : ''} — ${job.state}`);
   } catch (error) {
     job.state = 'error';
     job.stopReason = String(error?.message || error).slice(0, 300);
@@ -275,7 +324,7 @@ export async function cancel() {
   if (active) active.cancel = true;
   const job = await status();
   if (job && ['paused', 'interrupted'].includes(job.state)) {
-    for (const item of job.items) if (['queued', 'paused', 'creating', 'share-paused', 'sharing'].includes(item.state)) item.state = 'cancelled';
+    for (const item of job.items) if (['queued', 'paused', 'creating', 'share-paused', 'sharing', 'transferring'].includes(item.state)) item.state = 'cancelled';
     finish(job);
     await save(job);
   }
@@ -298,7 +347,7 @@ export async function resume() {
       throw new HubError('Мастер TikTok ещё не завершён. Проверьте вкладку и повторите.');
     }
   }
-  for (const item of job.items) if (['share-paused', 'sharing', 'paying'].includes(item.state)) item.state = 'created';
+  for (const item of job.items) if (['share-paused', 'sharing', 'paying', 'transferring'].includes(item.state)) item.state = 'created';
   job.state = 'running';
   job.pause = null;
   await save(job);

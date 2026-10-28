@@ -6,13 +6,14 @@ import { num, money, pct, ago } from '../lib/format.js';
 import { PERIODS } from '../../background/lib/constants.js';
 import { LEVELS, STATUS_FILTERS, SORTS, filterRows, sortRows, totals, toCsv, ROW_COLUMNS } from '../../background/explorer/model.js';
 import { LINK_BY_ID, resolveLink } from '../../background/links/catalog.js';
+import { openObjectsSheet } from './objects.js';
 
 const LEVEL_LINK = { campaign: 'campaigns', adgroup: 'adgroups', ad: 'ads' };
 const PAGE = 60;
 
 export function mountExplorer(root, ctx, { account, onBack }) {
   const settings = () => ctx.settings?.overview ?? { period: '7d' };
-  const S = { level: 'campaign', period: settings().period, status: 'all', q: '', sort: 'problems', data: null, loading: false, error: '', expanded: new Set(), limit: PAGE, seq: 0 };
+  const S = { level: 'campaign', period: settings().period, status: 'all', q: '', sort: 'problems', data: null, loading: false, error: '', expanded: new Set(), limit: PAGE, seq: 0, selected: new Set() };
   const memo = new Map();
   let stopped = false;
 
@@ -20,6 +21,7 @@ export function mountExplorer(root, ctx, { account, onBack }) {
   const totalsBar = h('div', { class: 'ex-totals' });
   const footer = h('div', { class: 'row wrap' });
   const status = h('div');
+  const bulkBar = h('div', { class: 'ov-selection', hidden: true });
 
   /* ---------- загрузка ---------- */
   async function load(force = false) {
@@ -56,12 +58,15 @@ export function mountExplorer(root, ctx, { account, onBack }) {
         h('button', { class: 'btn sm', type: 'button', onclick: async () => { if (await copyText(r.id)) toast('ID скопирован', 'ok'); } }, icon('copy', 13), 'ID'),
         h('button', { class: 'btn sm', type: 'button', onclick: () => openLevelPage(false) }, icon('external', 13), 'Открыть список'),
         r.level === 'ad' && r.moderation ? h('button', { class: 'btn sm primary', type: 'button', onclick: () => toAppeals() }, icon('send', 13), 'К апелляциям') : null)) : null;
+    const box = h('input', { type: 'checkbox', checked: S.selected.has(r.id), 'aria-label': `Выбрать ${r.name}` });
+    box.onchange = () => { if (box.checked) S.selected.add(r.id); else S.selected.delete(r.id); renderBulk(); };
     return h('div', { class: `ex-row status-${r.status}${open ? ' open' : ''}`, role: 'listitem' },
-      h('button', { class: 'ex-main', type: 'button', 'aria-expanded': String(open), onclick: () => { if (open) S.expanded.delete(r.id); else S.expanded.add(r.id); render(); } },
-        h('span', { class: `status-dot ${r.status === 'working' ? 'ok' : r.status === 'issue' ? 'warn' : ''}` }),
-        h('span', { class: 'ex-text' }, h('b', { title: r.name }, r.name),
-          h('small', null, r.status === 'issue' ? h('span', { class: 'ex-reason' }, r.reason) : r.status === 'off' ? 'Выключено' : 'Доставляется', parent ? ` · ${parent}` : '')),
-        h('span', { class: 'ex-metrics' }, h('b', null, money(r.spend, cur)), h('small', null, `${num(r.conversions)} конв.${r.cpa !== null ? ` · CPA ${num(r.cpa, 2)}` : ''}`))),
+      h('div', { class: 'ex-line' }, h('label', { class: 'select-box', title: 'Выбрать для массового действия' }, box),
+        h('button', { class: 'ex-main', type: 'button', 'aria-expanded': String(open), onclick: () => { if (open) S.expanded.delete(r.id); else S.expanded.add(r.id); render(); } },
+          h('span', { class: `status-dot ${r.status === 'working' ? 'ok' : r.status === 'issue' ? 'warn' : ''}` }),
+          h('span', { class: 'ex-text' }, h('b', { title: r.name }, r.name),
+            h('small', null, r.status === 'issue' ? h('span', { class: 'ex-reason' }, r.reason) : r.status === 'off' ? 'Выключено' : 'Доставляется', parent ? ` · ${parent}` : '')),
+          h('span', { class: 'ex-metrics' }, h('b', null, money(r.spend, cur)), h('small', null, `${num(r.conversions)} конв.${r.cpa !== null ? ` · CPA ${num(r.cpa, 2)}` : ''}`)))),
       detail);
   }
 
@@ -71,8 +76,25 @@ export function mountExplorer(root, ctx, { account, onBack }) {
       S.error ? h('div', { class: 'alert err' }, icon('alert', 15), h('div', null, S.error), h('button', { class: 'btn sm', type: 'button', onclick: () => load(true) }, 'Повторить')) : null);
   }
 
+  // Выбранные строки: массовое действие работает ровно по ним (ID уходят в движок как есть).
+  function renderBulk() {
+    const count = S.selected.size;
+    bulkBar.hidden = !count;
+    if (!count) { fill(bulkBar); return; }
+    const open = (action) => openObjectsSheet(ctx, { accounts: [{ id: account.id, name: account.name }], level: S.level, action, ids: { [account.id]: [...S.selected] }, lockLevel: true });
+    fill(bulkBar,
+      h('div', { class: 'row' }, h('b', null, `Выбрано: ${count}`), h('span', { class: 'spacer' }),
+        h('button', { class: 'linklike', type: 'button', onclick: () => { for (const r of rows()) S.selected.add(r.id); render(); } }, 'все видимые'),
+        h('button', { class: 'linklike', type: 'button', onclick: () => { S.selected.clear(); render(); } }, 'снять')),
+      h('div', { class: 'row wrap sel-actions' },
+        h('button', { class: 'btn sm primary', type: 'button', onclick: () => open('disable') }, 'Выключить'),
+        h('button', { class: 'btn sm', type: 'button', onclick: () => open('enable') }, 'Включить'),
+        h('button', { class: 'btn sm', type: 'button', onclick: () => open('rename') }, 'Имя'),
+        S.level === 'ad' ? null : h('button', { class: 'btn sm', type: 'button', onclick: () => open('budget') }, 'Бюджет')));
+  }
+
   function render() {
-    renderStatus();
+    renderStatus(); renderBulk();
     const all = rows();
     const cur = account.currency;
     if (S.data) {
@@ -109,7 +131,7 @@ export function mountExplorer(root, ctx, { account, onBack }) {
   const periodSelect = h('select', { class: 'select', 'aria-label': 'Период' }, PERIODS.map((p) => h('option', { value: p.id, selected: p.id === S.period }, p.title)));
   periodSelect.addEventListener('change', () => { S.period = periodSelect.value; load(); });
   const levelSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Уровень' });
-  const renderLevels = () => fill(levelSeg, LEVELS.map((l) => h('button', { type: 'button', 'aria-pressed': String(S.level === l.id), onclick: () => { S.level = l.id; S.expanded.clear(); renderLevels(); load(); } }, l.title)));
+  const renderLevels = () => fill(levelSeg, LEVELS.map((l) => h('button', { type: 'button', 'aria-pressed': String(S.level === l.id), onclick: () => { S.level = l.id; S.expanded.clear(); S.selected.clear(); renderLevels(); load(); } }, l.title)));
   const search = h('input', { class: 'input', type: 'search', placeholder: 'Поиск…', 'aria-label': 'Поиск' });
   search.addEventListener('input', () => { S.q = search.value; S.limit = PAGE; render(); });
   const statusSelect = h('select', { class: 'select', 'aria-label': 'Статус' }, STATUS_FILTERS.map((f) => h('option', { value: f.id }, f.title)));
@@ -125,7 +147,7 @@ export function mountExplorer(root, ctx, { account, onBack }) {
       h('button', { class: 'icon-btn', type: 'button', title: 'Обновить', 'aria-label': 'Обновить', onclick: () => load(true) }, icon('refresh', 15))),
     levelSeg,
     h('div', { class: 'row ex-filters' }, h('div', { class: 'search', style: { flex: '1' } }, icon('search', 14), search), statusSelect, sortSelect),
-    status, totalsBar, list, footer));
+    status, totalsBar, list, footer, bulkBar));
 
   renderLevels();
   render();

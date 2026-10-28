@@ -3,13 +3,20 @@
 import { h, fill, toast, copyText, download, debounce } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import * as bus from '../lib/bus.js';
-import { openShareSheet, shareJobBlock, targetPicker, permissionSelect, switchRow, checkRow, short } from './share.js';
+import { openShareSheet, shareJobBlock, targetPicker, permissionSelect, switchRow, checkRow, short, quickShare, quickShareConfig } from './share.js';
 
 const ID = /^\d{5,30}$/;
 const DEFAULTS = {
   mode: 'new-bc', count: 1, businessCenterId: '', bcTemplate: 'BC {date}-{rand}', adTemplate: 'RK {date}-{rand}-{n}',
-  linkPortfolio: false, closeTabs: true, share: { enabled: false, targets: [], permission: 'Admin', autoAccept: true }, partners: []
+  linkPortfolio: false, closeTabs: true, share: { enabled: false, targets: [], permission: 'Admin', autoAccept: true },
+  transfer: { enabled: false, targetBusinessCenterId: '' }, partners: [], presets: []
 };
+
+// Короткое описание профиля для подсказок: «5 × РК · карта · шаринг → 2 BC».
+export function describePreset(config = {}) {
+  return [`${config.count || 1} × ${config.mode === 'existing-bc' ? 'РК в BC' : 'BC + РК'}`, config.linkPortfolio ? 'карта' : '',
+    config.share?.enabled ? `шаринг → ${config.share.targets?.length || 0} BC` : '', config.transfer?.enabled ? 'transfer' : ''].filter(Boolean).join(' · ');
+}
 const pad = (n) => String(n).padStart(2, '0');
 const tail = () => crypto.getRandomValues(new Uint32Array(1))[0].toString(36).slice(-4).toUpperCase().padStart(4, 'X');
 const renderName = (template, n, rand) => {
@@ -20,7 +27,7 @@ const renderName = (template, n, rand) => {
 
 const ITEM_STATE = {
   queued: ['Ожидает', ''], creating: ['Создаётся…', 'info'], paused: ['Нужна проверка', 'warn'], created: ['Создан', 'ok'],
-  paying: ['Portfolio…', 'info'], sharing: ['Шаринг…', 'info'], 'share-paused': ['Шаринг ждёт', 'warn'],
+  paying: ['Portfolio…', 'info'], sharing: ['Шаринг…', 'info'], 'share-paused': ['Шаринг ждёт', 'warn'], transferring: ['Transfer…', 'info'],
   done: ['Готово', 'ok'], error: ['Ошибка', 'err'], cancelled: ['Отменено', '']
 };
 const JOB_STATE = {
@@ -31,7 +38,7 @@ const ACTIVE = ['running', 'paused', 'interrupted'];
 
 export function mountCreation(root, ctx) {
   const saved = ctx.settings?.automation || {};
-  let auto = { ...DEFAULTS, ...saved, share: { ...DEFAULTS.share, ...(saved.share || {}) }, partners: [...(saved.partners || [])] };
+  let auto = { ...DEFAULTS, ...saved, share: { ...DEFAULTS.share, ...(saved.share || {}) }, transfer: { ...DEFAULTS.transfer, ...(saved.transfer || {}) }, partners: [...(saved.partners || [])], presets: [...(saved.presets || [])] };
   let company = { companyMode: 'existing', companyName: '', companyWebsite: '', contactName: '', phone: '', email: '' };
   let job = null, shareJob = null, created = [], starting = false, showJob = false, stopped = false, pendingRender = false;
   const selected = new Set();
@@ -41,6 +48,42 @@ export function mountCreation(root, ctx) {
   const persist = debounce(() => { ctx.saveSettings({ automation: auto }).catch(() => {}); }, 350);
   const setAuto = (patch, rerender = true) => { auto = { ...auto, ...patch }; persist(); if (rerender) render(); };
   const setShare = (patch, rerender = true) => setAuto({ share: { ...auto.share, ...patch } }, rerender);
+  const handoff = () => (auto.share.enabled ? 'share' : auto.transfer.enabled ? 'transfer' : 'none');
+  const setHandoff = (mode) => setAuto({ share: { ...auto.share, enabled: mode === 'share' }, transfer: { ...auto.transfer, enabled: mode === 'transfer' } });
+
+  /* ---------- профили ---------- */
+  const presetConfig = () => { const { partners, presets, ...config } = auto; return JSON.parse(JSON.stringify(config)); };
+  let naming = false;
+  function commitPreset(name) {
+    const clean = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!clean) return toast('Введите название профиля', 'error');
+    const preset = { id: `p${Date.now().toString(36)}`, name: clean, config: presetConfig() };
+    naming = false;
+    setAuto({ presets: [preset, ...auto.presets.filter((item) => item.name !== preset.name)].slice(0, 12) });
+    toast('Профиль сохранён — его можно запускать в 1 клик из «Обзора»', 'ok', 5000);
+  }
+  function applyPreset(preset) {
+    setAuto({ ...DEFAULTS, ...preset.config, share: { ...DEFAULTS.share, ...(preset.config.share || {}) }, transfer: { ...DEFAULTS.transfer, ...(preset.config.transfer || {}) }, partners: auto.partners, presets: auto.presets });
+    toast(`Профиль «${preset.name}» подставлен`, 'ok');
+  }
+  function presetsRow() {
+    const input = naming ? h('input', { class: 'input', maxlength: '40', value: describePreset(auto), 'aria-label': 'Название профиля', style: { flex: '1', minWidth: '140px' } }) : null;
+    if (input) {
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') { event.preventDefault(); commitPreset(input.value); }
+        if (event.key === 'Escape') { event.stopPropagation(); naming = false; render(); }
+      });
+      queueMicrotask(() => { input.focus(); input.select(); });
+    }
+    return h('div', { class: 'preset-row' },
+      auto.presets.map((preset) => h('span', { class: 'target-chip' },
+        h('button', { type: 'button', class: 'target-main', title: describePreset(preset.config), onclick: () => applyPreset(preset) }, icon('star', 12), h('span', null, preset.name)),
+        h('button', { type: 'button', class: 'target-del', title: 'Удалить профиль', 'aria-label': `Удалить профиль ${preset.name}`, onclick: () => setAuto({ presets: auto.presets.filter((item) => item.id !== preset.id) }) }, icon('x', 11)))),
+      input ? [input,
+        h('button', { class: 'btn sm primary', type: 'button', onclick: () => commitPreset(input.value) }, 'Сохранить'),
+        h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { naming = false; render(); } }, 'Отмена')]
+        : h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { naming = true; render(); }, title: 'Сохранить текущие настройки как профиль для запуска в 1 клик' }, icon('plus', 12), 'Профиль'));
+  }
   const ownCenters = () => ctx.accounts.peek()?.businessCenters || [];
   const centers = () => {
     const map = new Map(ownCenters().map((bc) => [bc.id, bc.name]));
@@ -56,6 +99,7 @@ export function mountCreation(root, ctx) {
     if (starting || jobState() === 'running') return;
     if (auto.mode === 'existing-bc' && !ID.test(auto.businessCenterId)) return toast('Выберите Business Center', 'error');
     if (auto.share.enabled && !auto.share.targets.length) return toast('Выберите или добавьте BC, куда расшаривать', 'error');
+    if (auto.transfer.enabled && !ID.test(auto.transfer.targetBusinessCenterId || '')) return toast('Выберите BC, которому передать РК', 'error');
     if (company.companyMode === 'new' && company.companyName.trim().length < 2) return toast('Для новой Company укажите юридическое название', 'error');
     starting = true; showJob = true; render();
     try {
@@ -105,6 +149,9 @@ export function mountCreation(root, ctx) {
     openShareSheet(ctx, { accounts, onStarted: (next) => { shareJob = next; render(); } });
   }
 
+  const quickSelected = () => quickShare(ctx, created.filter((item) => selected.has(item.adAccountId))
+    .map((item) => ({ id: item.adAccountId, bcId: item.businessCenterId, name: item.adAccountName })), { onStarted: (next) => { shareJob = next; render(); } });
+
   async function copyIds() {
     const ids = created.filter((item) => selected.has(item.adAccountId)).map((item) => item.adAccountId);
     if (await copyText(ids.join('\n'))) toast(`Скопировано ID: ${ids.length}`, 'ok');
@@ -146,6 +193,7 @@ export function mountCreation(root, ctx) {
     const busy = starting || jobState() === 'running';
 
     return h('section', { class: 'card creation-hero' },
+      presetsRow(),
       h('div', { class: 'card-head' }, h('div', { class: 'card-title' }, icon('zap', 16), 'Создать в 1 клик'),
         h('div', { class: 'seg', role: 'group', 'aria-label': 'Что создать' },
           h('button', { type: 'button', 'aria-pressed': String(isNew), onclick: () => setAuto({ mode: 'new-bc' }) }, 'BC + РК'),
@@ -164,7 +212,19 @@ export function mountCreation(root, ctx) {
       h('p', { class: 'small muted' }, 'Подстановки: {date} {time} {n} — номер, {rand} — 4 случайных символа.'),
       h('div', { class: 'section-label' }, 'После создания'),
       switchRow('Подключить общую карту', 'Подтвердить Payment Portfolio, который TikTok сам предложит на шаге оплаты', auto.linkPortfolio, (value) => setAuto({ linkPortfolio: value })),
-      switchRow('Расшарить в другой BC', 'Partners → выбранные права на созданные РК', auto.share.enabled, (value) => setShare({ enabled: value })),
+      h('div', { class: 'field' }, h('span', { class: 'label' }, 'Передать в другой BC'),
+        h('div', { class: 'seg', role: 'group', 'aria-label': 'Передать в другой BC' },
+          h('button', { type: 'button', 'aria-pressed': String(handoff() === 'none'), onclick: () => setHandoff('none') }, 'Нет'),
+          h('button', { type: 'button', 'aria-pressed': String(handoff() === 'share'), onclick: () => setHandoff('share') }, 'Расшарить'),
+          h('button', { type: 'button', 'aria-pressed': String(handoff() === 'transfer'), onclick: () => setHandoff('transfer') }, 'Передать владение'))),
+      handoff() === 'transfer' ? h('div', { class: 'share-box' },
+        targetPicker({
+          label: 'Кому передать (BC получателя)', partners: auto.partners, own: ownCenters(),
+          value: auto.transfer.targetBusinessCenterId ? [auto.transfer.targetBusinessCenterId] : [], exclude: isNew ? [] : [auto.businessCenterId],
+          onChange: (targets) => setAuto({ transfer: { ...auto.transfer, enabled: true, targetBusinessCenterId: targets.filter((id) => id !== auto.transfer.targetBusinessCenterId).at(-1) || targets.at(-1) || '' } }),
+          onPartners: (partners) => setAuto({ partners }, false)
+        }),
+        h('p', { class: 'small muted' }, 'Self-service transfer: TikTok отправит запрос, получатель одобряет его в своём BC. Доступен не всем BC, а новые РК должны пройти проверку (Approved). Если меню Transfer нет — выбирайте «Расшарить».')) : null,
       auto.share.enabled ? h('div', { class: 'share-box' },
         targetPicker({
           partners: auto.partners, own: ownCenters(), value: auto.share.targets,
@@ -192,7 +252,10 @@ export function mountCreation(root, ctx) {
         ids ? h('span', { class: 'mono small muted' }, ids) : item.businessCenterName ? h('span', { class: 'small muted' }, `BC «${item.businessCenterName}»`) : null,
         item.error ? h('span', { class: 'small err-text' }, item.error) : null,
         item.payment ? h('span', { class: 'small' }, item.payment.success ? `Portfolio ✓ ${item.payment.portfolio?.name || item.payment.portfolio?.id || ''}` : item.payment.skipped ? `Portfolio: ${item.payment.note}` : `Portfolio: ${item.payment.error}`) : null,
-        shareLine ? h('span', { class: 'small' }, shareLine) : null),
+        shareLine ? h('span', { class: 'small' }, shareLine) : null,
+        item.transfer ? h('span', { class: 'small' }, item.transfer.requested
+          ? `Transfer → ${partnerName(job?.plan?.transfer?.targetBusinessCenterId)}: запрос отправлен, ждёт одобрения ✓`
+          : `Transfer: ${item.transfer.hint || item.transfer.error || (item.transfer.pending ? 'TikTok обрабатывает' : item.transfer.state)}`) : null),
       h('div', { class: 'pipe-side' },
         h('span', { class: `pill ${kind}` }, label),
         item.tabId && ['paused', 'error', 'share-paused'].includes(item.state) ? h('button', { class: 'linklike', type: 'button', onclick: () => openPipelineTab(item.index) }, 'вкладка') : null));
@@ -214,11 +277,11 @@ export function mountCreation(root, ctx) {
           ['paused', 'interrupted'].includes(state) ? h('button', { class: 'btn sm', type: 'button', onclick: () => pipelineAction('cancel') }, 'Отменить') : null,
           !ACTIVE.includes(state) ? h('button', { class: 'icon-btn', type: 'button', title: 'Скрыть', 'aria-label': 'Скрыть', onclick: () => { showJob = false; render(); } }, icon('x', 14)) : null)),
       h('div', { class: `progress${state === 'running' && !finished ? ' indeterminate' : ''}` }, h('i', { style: { width: `${pct}%` } })),
-      h('p', { class: 'small muted' }, `${finished} из ${items.length}${job.plan?.linkPortfolio ? ' · Portfolio' : ''}${job.plan?.share?.enabled ? ` · шаринг → ${job.plan.share.targets.map(partnerName).join(', ')} (${job.plan.share.permission})` : ''}`),
+      h('p', { class: 'small muted' }, `${finished} из ${items.length}${job.plan?.linkPortfolio ? ' · Portfolio' : ''}${job.plan?.share?.enabled ? ` · шаринг → ${job.plan.share.targets.map(partnerName).join(', ')} (${job.plan.share.permission})` : ''}${job.plan?.transfer?.enabled ? ` · transfer → ${partnerName(job.plan.transfer.targetBusinessCenterId)}` : ''}`),
       job.pause?.hint ? h('div', { class: 'alert warn' }, icon('alert', 15), h('div', { class: 'grow' }, job.pause.hint,
         job.pause.tabId ? h('div', null, h('button', { class: 'linklike', type: 'button', onclick: () => openPipelineTab(job.pause.index) }, 'Открыть вкладку TikTok')) : null)) : null,
       job.stopReason ? h('div', { class: 'alert err' }, icon('alert', 15), h('div', null, job.stopReason)) : null,
-      step?.phase && state === 'running' ? h('p', { class: 'small' }, step.phase === 'accept' ? `Принимаю приглашение в ${partnerName(step.target)}…` : `Расшариваю в ${partnerName(step.target)}…`) : null,
+      step?.phase && state === 'running' ? h('p', { class: 'small' }, step.phase === 'accept' ? `Принимаю приглашение в ${partnerName(step.target)}…` : step.phase === 'transfer' ? `Передаю владение в ${partnerName(step.target)}…` : `Расшариваю в ${partnerName(step.target)}…`) : null,
       h('div', { class: 'pipe-list' }, items.map(itemRow)));
   }
 
@@ -252,7 +315,8 @@ export function mountCreation(root, ctx) {
         h('label', { class: 'check' }, all, h('span', null, 'Все')),
         h('span', { class: 'spacer' }),
         h('button', { class: 'btn sm', type: 'button', disabled: !count, onclick: copyIds }, icon('copy', 13), 'ID'),
-        h('button', { class: 'btn sm primary', type: 'button', disabled: !count, onclick: shareSelected }, icon('send', 13), count ? `Расшарить ${count}` : 'Расшарить')),
+        quickShareConfig(ctx).targets.length ? h('button', { class: 'btn sm primary', type: 'button', disabled: !count, title: 'С сохранёнными получателем и правами', onclick: quickSelected }, icon('zap', 13), `→ ${quickShareConfig(ctx).label}`) : null,
+        h('button', { class: `btn sm${quickShareConfig(ctx).targets.length ? '' : ' primary'}`, type: 'button', disabled: !count, onclick: shareSelected }, icon('send', 13), count ? `Расшарить ${count}` : 'Расшарить')),
       h('div', { class: 'created-list' }, visible.map(createdRow)),
       created.length > visible.length ? h('p', { class: 'small muted' }, `Показаны последние ${visible.length} из ${created.length}; CSV содержит все.`) : null,
       h('div', { class: 'row' }, h('span', { class: 'spacer' }), h('button', { class: 'linklike', type: 'button', onclick: clearCreated }, 'очистить список')));

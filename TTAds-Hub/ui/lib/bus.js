@@ -90,11 +90,32 @@ export const access = {
   request: (input) => call('access', 'request', { input }),
   transfer: (input) => call('access', 'transfer', { input }),
   linkPortfolio: (input) => call('access', 'linkPortfolio', { input }),
+  batch: (input) => call('access', 'batch', { input }),
   status: () => call('access', 'status'),
   openLast: () => call('access', 'openLast')
 };
 
 export const context = { get: () => call('context', 'get') };
+
+export const objects = {
+  status: () => call('objects', 'status'),
+  learnStart: (input) => call('objects', 'learnStart', { input }),
+  learnStop: () => call('objects', 'learnStop'),
+  plan: (input) => call('objects', 'plan', { input }),
+  apply: (input) => call('objects', 'apply', { input }),
+  rollback: () => call('objects', 'rollback'),
+  cancel: () => call('objects', 'cancel'),
+  diagnostics: () => call('objects', 'diagnostics'),
+  reset: () => call('objects', 'reset')
+};
+
+export const health = {
+  start: (input = {}) => call('health', 'start', { input }),
+  status: () => call('health', 'status'),
+  cancel: () => call('health', 'cancel'),
+  cached: () => call('health', 'cached'),
+  clear: () => call('health', 'clear')
+};
 
 export const appeals = {
   scan: (tabId) => call('appeals', 'scan', { tabId }),

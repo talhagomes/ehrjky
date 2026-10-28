@@ -14,6 +14,9 @@ import * as access from './access/engine.js';
 import * as pipeline from './pipeline/engine.js';
 import * as share from './share/engine.js';
 import * as registry from './lib/registry.js';
+import * as health from './health/engine.js';
+import * as objects from './objects/engine.js';
+import { registerRecorder, startLearn, stopLearn } from './objects/learn.js';
 import { registerOmnibox, suggestFor, enter as omniboxEnter, currentContext } from './links/omnibox.js';
 import { registerContextTracking, getLastContext } from './links/context.js';
 import { sendTestEvent } from './s2s/events.js';
@@ -25,6 +28,8 @@ manual.registerManualListeners();
 registerContextTracking();
 registerOmnibox();
 monitor.registerMonitor();
+registerRecorder();
+health.registerHealthMonitor();
 
 chrome.runtime.onInstalled.addListener((details) => {
   log('info', 'sys', details.reason === 'install' ? `Установлен TTAds Hub ${VERSION}` : `TTAds Hub обновлён до ${VERSION}`);
@@ -77,7 +82,27 @@ const handlers = {
   'access.request': ({ input }) => access.requestAccess(input),
   'access.transfer': ({ input }) => access.transfer(input),
   'access.linkPortfolio': ({ input }) => access.linkPortfolio(input),
+  'access.batch': ({ input }) => access.runGroups(input),
   'access.status': () => access.status(),
+  // Проверка РК: статус, билл (порог), долг, баланс, карта — по всем или выбранным кабинетам.
+  'health.start': async ({ input }) => {
+    const settings = await getSettings();
+    return health.start({ concurrency: settings.health.concurrency, skipBc: !settings.health.includeBc, ...(input || {}) });
+  },
+  'health.status': () => health.status(),
+  'health.cancel': () => health.cancel(),
+  'health.cached': () => health.cached(),
+  'health.clear': () => health.clear(),
+  // Массовые вкл/выкл, имя и бюджет по контрактам, снятым с реального запроса TikTok.
+  'objects.status': () => objects.status(),
+  'objects.learnStart': ({ input }) => startLearn(input || {}),
+  'objects.learnStop': async () => { await stopLearn(); return { ok: true }; },
+  'objects.plan': ({ input }) => objects.plan(input),
+  'objects.apply': ({ input }) => objects.apply(input),
+  'objects.rollback': () => objects.rollback(),
+  'objects.cancel': () => objects.cancel(),
+  'objects.diagnostics': () => objects.diagnostics(),
+  'objects.reset': async () => { await objects.reset(); return objects.status(); },
   'access.openLast': () => access.openLast(),
   'manual.status': async ({ tabId }) => {
     const tab = await chrome.tabs.get(tabId).catch(() => null);
@@ -133,12 +158,12 @@ const handlers = {
   'journal.get': () => readJournal(),
   'journal.clear': async () => { await clearJournal(); return { ok: true }; },
   'settings.get': () => getSettings(),
-  'settings.save': async ({ settings }) => { const saved = await saveSettings(settings); await monitor.applyAlarm(saved); return saved; },
-  'settings.patch': async ({ patch }) => { const saved = await patchSettings(patch); if (patch?.monitor) await monitor.applyAlarm(saved); return saved; }
+  'settings.save': async ({ settings }) => { const saved = await saveSettings(settings); await monitor.applyAlarm(saved); await health.applyAlarm(saved); return saved; },
+  'settings.patch': async ({ patch }) => { const saved = await patchSettings(patch); if (patch?.monitor) await monitor.applyAlarm(saved); if (patch?.health) await health.applyAlarm(saved); return saved; }
 };
 
 // Хуки для автотестов: позволяют проверить omnibox и мониторинг без реального ввода в адресную строку и ожидания таймера.
-globalThis.__tth = { omnibox: { suggestFor, enter: omniboxEnter, currentContext }, monitor, accounts, overview };
+globalThis.__tth = { omnibox: { suggestFor, enter: omniboxEnter, currentContext }, monitor, accounts, overview, health };
 
 // Токен-бакет: не больше ~1 записи MNL в секунду (всплеск до 60), чтобы страница не вытеснила журнал.
 const mnlBucket = { tokens: 60, at: Date.now() };

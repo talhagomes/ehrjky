@@ -31,7 +31,7 @@ export function checkRow(text, checked, onChange) {
 }
 
 // Получатели: сохранённые партнёры + собственные BC из кэша Ads Manager + ручной ввод ID (сохраняется в партнёры).
-export function targetPicker({ partners = [], own = [], value = [], exclude = [], onChange, onPartners }) {
+export function targetPicker({ partners = [], own = [], value = [], exclude = [], onChange, onPartners, label = 'Куда расшарить' }) {
   const selected = new Set(value);
   const host = h('div', { class: 'target-picker' });
   const idInput = h('input', { class: 'input mono', inputmode: 'numeric', placeholder: 'ID BC получателя', maxlength: '30' });
@@ -64,7 +64,7 @@ export function targetPicker({ partners = [], own = [], value = [], exclude = []
   function render() {
     const list = choices();
     fill(host,
-      h('span', { class: 'label' }, 'Куда расшарить'),
+      h('span', { class: 'label' }, label),
       list.length ? h('div', { class: 'target-chips' }, list.map((item) => {
         const on = selected.has(item.id);
         return h('span', { class: `target-chip${on ? ' on' : ''}` },
@@ -85,6 +85,42 @@ export function targetPicker({ partners = [], own = [], value = [], exclude = []
   }
   render();
   return host;
+}
+
+export function targetName(ctx, id) {
+  const auto = ctx.settings?.automation || {};
+  return auto.partners?.find((item) => item.id === id)?.name || ctx.accounts.peek()?.businessCenters?.find((item) => item.id === id)?.name || `BC ${short(id)}`;
+}
+
+// Получатели и права из последнего сохранённого выбора: по ним работает кнопка «в один клик».
+export function quickShareConfig(ctx) {
+  const share = ctx.settings?.automation?.share || {};
+  const targets = (share.targets || []).filter((id) => ID.test(id));
+  const first = targets[0] ? targetName(ctx, targets[0]) : '';
+  return { targets, permission: share.permission || 'Admin', autoAccept: share.autoAccept !== false, label: targets.length ? `${first}${targets.length > 1 ? ` +${targets.length - 1}` : ''}` : '' };
+}
+
+// Расшарить без шторки. РК без известного BC-владельца пропускаются (для них нужна шторка с выбором BC).
+export async function quickShare(ctx, accounts, { onStarted } = {}) {
+  const config = quickShareConfig(ctx);
+  if (!config.targets.length) return openShareSheet(ctx, { accounts, onStarted });
+  const map = new Map();
+  for (const item of accounts) {
+    if (!ID.test(item.bcId || '')) continue;
+    if (!map.has(item.bcId)) map.set(item.bcId, []);
+    map.get(item.bcId).push(item.id);
+  }
+  if (!map.size) return openShareSheet(ctx, { accounts, onStarted });
+  const skipped = accounts.filter((item) => !ID.test(item.bcId || '')).length;
+  try {
+    const job = await bus.share.start({ groups: [...map].map(([sourceBusinessCenterId, accountIds]) => ({ sourceBusinessCenterId, accountIds })), targets: config.targets, permission: config.permission, autoAccept: config.autoAccept });
+    toast(`Шаринг → ${config.label} запущен${skipped ? ` (${skipped} РК без BC пропущены)` : ''} — окно можно закрыть`, 'ok', 6000);
+    onStarted?.(job);
+    return job;
+  } catch (error) {
+    toast(error.message, 'error', 7000);
+    return null;
+  }
 }
 
 // Шторка «Расшарить выбранные РК»: группирует кабинеты по исходному BC и запускает фоновую задачу.

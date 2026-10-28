@@ -1,0 +1,11 @@
+{
+  "name": "ttads-hub",
+  "private": true,
+  "type": "module",
+  "description": "TTAds Hub — Chrome-расширение для TikTok Ads Manager (dev-скрипты: тесты, проверка синтаксиса, сборка zip).",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "build": "node scripts/build.mjs"
+  }
+}

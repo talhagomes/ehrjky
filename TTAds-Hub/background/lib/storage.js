@@ -1,5 +1,5 @@
 import {
-  DEFAULT_AUTOMATION_FIELDS, DEFAULT_LABELS, DEFAULT_APPEAL_TEXT, PERIODS, MONITOR_INTERVALS, META_COLORS, DEFAULT_NAME_TEMPLATES
+  DEFAULT_AUTOMATION_FIELDS, DEFAULT_LABELS, DEFAULT_APPEAL_TEXT, PERIODS, MONITOR_INTERVALS, HEALTH_INTERVALS, META_COLORS, DEFAULT_NAME_TEMPLATES
 } from './constants.js';
 import { normalizeLinksSettings, DEFAULT_LINKS_SETTINGS } from '../links/catalog.js';
 
@@ -26,8 +26,11 @@ export const DEFAULT_SETTINGS = Object.freeze({
     bcTemplate: DEFAULT_NAME_TEMPLATES.bc, adTemplate: DEFAULT_NAME_TEMPLATES.ad,
     linkPortfolio: false, closeTabs: true,
     share: { enabled: false, targets: [], permission: 'Admin', autoAccept: true },
-    partners: []
+    transfer: { enabled: false, targetBusinessCenterId: '' },
+    partners: [],
+    presets: []
   },
+  health: { concurrency: 2, includeBc: true, auto: { enabled: false, intervalMin: 60, notify: false } },
   ui: { theme: 'dark' }
 });
 
@@ -63,8 +66,24 @@ export function normalizeAccountMeta(raw) {
 const BC_ID = /^\d{5,30}$/;
 const idList = (value, max) => [...new Set((Array.isArray(value) ? value : []).map(String).filter((id) => BC_ID.test(id)))].slice(0, max);
 
+const PRESET_LIMIT = 12;
+
+// Профили конвейера: сохранённые наборы «сколько, где, имена, Portfolio, шаринг/transfer» для запуска в один клик.
+export function normalizePresets(raw) {
+  const out = [];
+  for (const item of Array.isArray(raw) ? raw : []) {
+    const id = String(item?.id ?? '').replace(/[^\w-]/g, '').slice(0, 40);
+    const name = String(item?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!id || !name || out.some((p) => p.id === id)) continue;
+    const { partners, presets, ...config } = normalizeAutomation(item.config ?? {});
+    out.push({ id, name, config });
+    if (out.length >= PRESET_LIMIT) break;
+  }
+  return out;
+}
+
 export function normalizeAutomation(raw = {}) {
-  const d = DEFAULT_SETTINGS.automation, share = raw.share ?? {};
+  const d = DEFAULT_SETTINGS.automation, share = raw.share ?? {}, transfer = raw.transfer ?? {};
   const partners = [];
   for (const item of Array.isArray(raw.partners) ? raw.partners : []) {
     const id = String(item?.id ?? '');
@@ -86,7 +105,13 @@ export function normalizeAutomation(raw = {}) {
       permission: ['Admin', 'Operator', 'Analyst'].includes(share.permission) ? share.permission : d.share.permission,
       autoAccept: share.autoAccept !== false
     },
-    partners
+    transfer: {
+      // Передача владения и шаринг взаимоисключающие: при обоих включённых побеждает шаринг (как в 1.5.0).
+      enabled: transfer.enabled === true && share.enabled !== true,
+      targetBusinessCenterId: BC_ID.test(String(transfer.targetBusinessCenterId ?? '')) ? String(transfer.targetBusinessCenterId) : ''
+    },
+    partners,
+    presets: Array.isArray(raw.presets) && raw.presets.length ? normalizePresets(raw.presets) : []
   };
 }
 
@@ -129,10 +154,19 @@ export function normalizeSettings(raw = {}) {
     overview: {
       period: PERIODS.some((p) => p.id === ov.period) ? ov.period : d.overview.period,
       sort: ['problems', 'spend', 'name'].includes(ov.sort) ? ov.sort : d.overview.sort,
-      filter: ['all', 'issues', 'working', 'off'].includes(ov.filter) ? ov.filter : d.overview.filter
+      filter: ['all', 'issues', 'working', 'off', 'no-card', 'debt', 'suspended', 'review'].includes(ov.filter) ? ov.filter : d.overview.filter
     },
     accounts: { meta: normalizeAccountMeta(raw.accounts?.meta) },
     automation: normalizeAutomation(raw.automation ?? {}),
+    health: {
+      concurrency: clampInt(raw.health?.concurrency, 1, 3, d.health.concurrency),
+      includeBc: raw.health?.includeBc !== false,
+      auto: {
+        enabled: raw.health?.auto?.enabled === true,
+        intervalMin: nearest(raw.health?.auto?.intervalMin, HEALTH_INTERVALS, d.health.auto.intervalMin),
+        notify: raw.health?.auto?.notify === true
+      }
+    },
     ui: { theme: ['auto', 'dark', 'light'].includes(u.theme) ? u.theme : d.ui.theme }
   };
 }

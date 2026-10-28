@@ -85,8 +85,9 @@ export const ACCOUNT_COLUMNS = Object.freeze([
   { title: 'Метка', get: (a) => a.meta?.label ?? '' }, { title: 'Заметка', get: (a) => a.meta?.note ?? '' }
 ]);
 
-export function accountsToCsv(accounts, meta = {}) {
-  return toCsv(accounts.map((a) => ({ ...a, meta: meta[a.id] ?? {} })), ACCOUNT_COLUMNS);
+// extra — дополнительные колонки (например, статус/билл/карта); healthOf(a) добавляет строке поле health.
+export function accountsToCsv(accounts, meta = {}, extra = [], healthOf = null) {
+  return toCsv(accounts.map((a) => ({ ...a, meta: meta[a.id] ?? {}, health: healthOf ? healthOf(a) : null })), [...ACCOUNT_COLUMNS, ...extra]);
 }
 
 export { reasonText };

@@ -46,6 +46,7 @@ export const PERIODS = Object.freeze([
 ]);
 
 export const MONITOR_INTERVALS = Object.freeze([5, 10, 15, 30, 60]);
+export const HEALTH_INTERVALS = Object.freeze([30, 60, 180, 360, 720]);
 export const META_COLORS = Object.freeze(['gray', 'red', 'orange', 'yellow', 'green', 'blue', 'purple']);
 
 // Шаблоны имён для конвейера: {date} ММДД, {time} ЧЧММ, {n} номер в пачке, {rand} 4 случайных символа.

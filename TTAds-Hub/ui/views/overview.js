@@ -3,18 +3,29 @@
 import { h, fill, copyText, toast, download } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import * as bus from '../lib/bus.js';
-import { money, clock, ago } from '../lib/format.js';
+import { money, num, clock, ago } from '../lib/format.js';
 import { PERIODS, META_COLORS } from '../../background/lib/constants.js';
 import { LINK_BY_ID, resolveLink } from '../../background/links/catalog.js';
 import { ACCOUNT_STATES, countAccounts, filterAccounts, sortAccounts, spendByCurrency, needsTopUp, accountsToCsv } from '../../background/overview/model.js';
 import { mountExplorer } from './explorer.js';
+import { describePreset } from './creation.js';
+import { healthOf, HEALTH_FILTERS, countFlags, HEALTH_COLUMNS } from '../../background/health/model.js';
+import { STATUS_KINDS } from '../../background/health/parse.js';
+import { openShareSheet, shareJobBlock, quickShare, quickShareConfig } from './share.js';
+import { openTransferSheet, openPortfolioSheet, batchJobBlock } from './bulk.js';
+import { openObjectsSheet } from './objects.js';
+
+const HEALTH_FILTER_IDS = new Set(HEALTH_FILTERS.map(([id]) => id));
 
 const FILTERS = [['all', 'Все'], ['issues', 'Проблемы'], ['working', 'Работают'], ['off', 'Выкл.']];
 const SORTS = [['problems', 'Проблемы'], ['spend', 'Расход ↓'], ['name', 'Название']];
 const COLOR_NAMES = { gray: 'серый', red: 'красный', orange: 'оранжевый', yellow: 'жёлтый', green: 'зелёный', blue: 'синий', purple: 'фиолетовый' };
 
 export function mountOverview(root, ctx) {
-  const S = { data: null, loading: false, error: '', soft: false, q: '', metaOpen: new Set(), exportOpen: false, seq: 0, monitor: null, quickRunning: false, quickJob: null };
+  const S = {
+    data: null, loading: false, error: '', soft: false, q: '', metaOpen: new Set(), exportOpen: false, seq: 0, monitor: null, quickRunning: false, quickJob: null,
+    health: { accounts: {}, bcs: {} }, healthJob: null, selected: new Set(), shareJob: null, batchJob: null, hidden: new Set()
+  };
   let stopped = false, unmountExplorer = null;
   const base = ctx.settings?.overview ?? { period: '7d', sort: 'problems', filter: 'all' };
   const prefs = { ...base };
@@ -31,7 +42,10 @@ export function mountOverview(root, ctx) {
   const cards = h('div', { class: 'stack ov-cards' });
   const foot = h('div', { class: 'ov-foot' });
   const quick = h('div');
-  const listPane = h('div', { class: 'stack' }, quick, toolbar, searchRow, chips, summary, cards, foot);
+  const healthBar = h('div');
+  const batchBox = h('div', { class: 'stack' });
+  const selectionBar = h('div', { class: 'ov-selection', hidden: true });
+  const listPane = h('div', { class: 'stack' }, quick, healthBar, toolbar, searchRow, chips, summary, batchBox, cards, selectionBar, foot);
   const explorePane = h('div', { hidden: true });
   root.append(listPane, explorePane);
 
@@ -69,6 +83,17 @@ export function mountOverview(root, ctx) {
     if (!stopped) renderQuick();
   }
 
+  async function runPreset(preset) {
+    if (S.quickRunning) return;
+    S.quickRunning = true; renderQuick();
+    try {
+      S.quickJob = await bus.pipeline.start(preset.config);
+      toast(`Профиль «${preset.name}» запущен — прогресс на вкладке «Создать»`, 'ok', 6000);
+    } catch (error) { toast(error.message, 'error', 7000); }
+    S.quickRunning = false;
+    if (!stopped) renderQuick();
+  }
+
   const QUICK_LABEL = { running: 'Создаю…', paused: 'Нужно подтверждение TikTok', interrupted: 'Прервано — откройте «Создать»', complete: 'Создано', partial: 'Создано с замечаниями', error: 'Ошибка', cancelled: 'Остановлено' };
 
   function renderQuick() {
@@ -78,6 +103,7 @@ export function mountOverview(root, ctx) {
     const attention = ['paused', 'error', 'partial', 'interrupted'].includes(state);
     const busy = S.quickRunning || state === 'running';
     const auto = ctx.settings?.automation;
+    const presets = auto?.presets || [];
     const extras = ['Текущая Company', 'авто-имена', auto?.linkPortfolio ? 'общая карта' : '', auto?.share?.enabled && auto.share.targets?.length ? `шаринг → ${auto.share.targets.length} BC` : ''].filter(Boolean);
     fill(quick,
       h('section', { class: `card quick-create${ok ? ' done' : attention ? ' attention' : ''}` },
@@ -91,7 +117,127 @@ export function mountOverview(root, ctx) {
           h('span', null, (QUICK_LABEL[state] || state) + (job.items?.length > 1 ? ` · ${job.items.filter((entry) => entry.state === 'done').length}/${job.items.length}` : '')),
           result.businessCenterId ? h('span', { class: 'mono' }, `BC …${result.businessCenterId.slice(-8)}`) : null,
           result.adAccountId ? h('span', { class: 'mono' }, `РК …${result.adAccountId.slice(-8)}`) : null,
-          h('button', { class: 'linklike', type: 'button', onclick: () => ctx.show('creation') }, attention ? 'Открыть' : 'Подробнее')) : null));
+          h('button', { class: 'linklike', type: 'button', onclick: () => ctx.show('creation') }, attention ? 'Открыть' : 'Подробнее')) : null,
+        presets.length ? h('div', { class: 'preset-row' }, presets.slice(0, 8).map((preset) => h('button', { class: 'btn sm', type: 'button', disabled: busy, title: describePreset(preset.config), onclick: () => runPreset(preset) }, icon('zap', 12), preset.name))) : null));
+  }
+
+  /* ---------- проверка РК: статус, билл (порог), долг, баланс, карта ---------- */
+  const healthFor = (a) => healthOf(a, S.health.accounts?.[a.id] ?? null);
+  const healthRunning = () => S.healthJob?.state === 'running' && Date.now() - (S.healthJob.heartbeat || 0) < 3 * 60 * 1000;
+
+  async function startHealth(ids, force = false) {
+    if (!ids?.length) return toast('Нет кабинетов для проверки — обновите список', 'error');
+    try {
+      S.healthJob = await bus.health.start({ accountIds: ids, force });
+      toast(S.healthJob?.note || `Проверяю ${S.healthJob.accounts} РК в фоне — окно можно закрыть`, S.healthJob?.note ? 'info' : 'ok', 6000);
+    } catch (error) { toast(error.message, 'error', 7000); }
+    renderHealthBar();
+  }
+
+  function renderHealthBar() {
+    const job = S.healthJob, running = healthRunning();
+    const list = S.data?.accounts || [];
+    const healths = list.map(healthFor);
+    const counts = countFlags(healths);
+    const lastAt = Math.max(0, ...healths.map((x) => x.at || 0));
+    const selected = S.selected.size;
+    const targets = () => (selected ? [...S.selected] : list.map((a) => a.id));
+    const pct = job?.total ? Math.round((job.done / job.total) * 100) : 0;
+    fill(healthBar, h('section', { class: `card health-card${running ? ' running' : ''}` },
+      h('div', { class: 'card-head' },
+        h('div', null,
+          h('div', { class: 'card-title' }, icon('shield', 16), 'Статус, билл и карта'),
+          h('p', { class: 'card-sub' }, running
+            ? `${job.phase === 'bc' ? 'Таблицы Business Center' : 'Платёжные страницы РК'} · ${job.done}/${job.total}`
+            : counts.checked ? `Проверено ${counts.checked} из ${list.length}${lastAt ? ` · ${ago(lastAt)}` : ''}` : 'Статус РК, порог автоплатежа (билл), долг, баланс и привязанная карта')),
+        running
+          ? h('button', { class: 'btn sm', type: 'button', onclick: async () => { try { S.healthJob = await bus.health.cancel(); } catch (error) { toast(error.message, 'error'); } renderHealthBar(); } }, icon('stop', 13), 'Стоп')
+          : h('div', { class: 'row' },
+            h('button', { class: 'btn sm primary', type: 'button', disabled: !list.length, onclick: () => startHealth(targets()) }, icon('refresh', 13), selected ? `Проверить ${selected}` : 'Проверить все'),
+            counts.checked ? h('button', { class: 'icon-btn', type: 'button', title: 'Перепроверить без кэша (30 мин)', 'aria-label': 'Перепроверить без кэша', onclick: () => startHealth(targets(), true) }, icon('activity', 15)) : null)),
+      running ? h('div', { class: `progress${job.done ? '' : ' indeterminate'}` }, h('i', { style: { width: `${pct}%` } })) : null,
+      !running && job && ['error', 'partial'].includes(job.state) ? h('p', { class: 'small muted' }, job.error || `Не прочитано: ${job.failed} из ${job.total} — причина в карточке РК.`) : null,
+      counts.checked ? h('div', { class: 'health-counts' },
+        h('span', { class: 'pill ok' }, `С картой: ${counts.cards}`),
+        counts['no-card'] ? h('span', { class: 'pill warn' }, `Без карты: ${counts['no-card']}`) : null,
+        counts.debt ? h('span', { class: 'pill err' }, `Долг/оплата: ${counts.debt}`) : null,
+        counts.suspended ? h('span', { class: 'pill err' }, `Бан: ${counts.suspended}`) : null,
+        counts.review ? h('span', { class: 'pill warn' }, `На проверке: ${counts.review}`) : null) : null));
+  }
+
+  function healthBlock(a) {
+    const hl = healthFor(a);
+    const refresh = h('button', { class: 'linklike', type: 'button', disabled: healthRunning(), onclick: () => startHealth([a.id], true) }, hl.checked ? 'обновить' : 'проверить');
+    if (!hl.checked) return h('div', { class: 'health-line' }, h('span', { class: 'small muted' }, 'Статус, билл и карта не проверены'), refresh);
+    const tone = STATUS_KINDS[hl.status.kind]?.[1] || '';
+    const b = hl.billing, t = b.threshold;
+    const parts = [];
+    if (t) parts.push(h('span', { title: 'Порог автоплатежа: TikTok спишет сумму с карты, когда расход дойдёт до порога или наступит дата списания' }, 'Билл: ',
+      h('b', null, t.used !== null ? `${num(t.used, 2)} / ${money(t.limit, t.currency)}` : money(t.limit, t.currency)), t.pct !== null ? ` (${t.pct}%)` : ''));
+    if (b.billingDate) parts.push(h('span', null, `списание ${b.billingDate}`));
+    if (b.amountDue?.value > 0) parts.push(h('span', { class: 'err-text' }, 'Долг: ', h('b', null, money(b.amountDue.value, b.amountDue.currency))));
+    if (b.balance) parts.push(h('span', null, 'Баланс: ', h('b', null, money(b.balance.value, b.balance.currency))));
+    if (b.adCredit?.value > 0) parts.push(h('span', null, 'Кредит: ', h('b', null, money(b.adCredit.value, b.adCredit.currency))));
+    if (b.paid) parts.push(h('span', { title: 'Сумма успешных платежей в видимой истории транзакций' }, 'Оплачено: ', h('b', null, money(b.paid.value, b.paid.currency)), ` (${b.paid.count})`));
+    if (b.failedCount) parts.push(h('span', { class: 'err-text' }, `Отказов: ${b.failedCount}`));
+    return h('div', { class: 'health-box' },
+      h('div', { class: 'health-pills' },
+        h('span', { class: `pill ${tone}`, title: hl.status.text || '' }, hl.status.label),
+        hl.card.label ? h('span', { class: `pill ${hl.card.linked ? 'ok' : hl.card.linked === false ? 'warn' : ''}`, title: hl.card.expiry ? `Срок действия ${hl.card.expiry}` : '' }, icon('card', 11), hl.card.label) : null,
+        b.text ? h('span', { class: 'pill' }, b.text) : null,
+        b.autopayPaused ? h('span', { class: 'pill err' }, 'Автоплатёж на паузе') : null,
+        b.paymentFailed ? h('span', { class: 'pill err' }, 'Платёж не прошёл') : null,
+        hl.flags.includes('verify-phone') ? h('span', { class: 'pill warn' }, 'Подтвердить телефон') : null),
+      parts.length ? h('div', { class: 'health-kv' }, parts) : null,
+      hl.error ? h('p', { class: 'small muted' }, `Платёжная страница: ${hl.error}`) : null,
+      h('div', { class: 'health-foot' }, h('span', { class: 'hint' }, `проверено ${ago(hl.at)}`), refresh));
+  }
+
+  /* ---------- выбор РК и массовые действия ---------- */
+  const selectedAccounts = () => (S.data?.accounts || []).filter((a) => S.selected.has(a.id)).map((a) => ({ id: a.id, bcId: a.bcId, name: a.name }));
+
+  function selectBox(a) {
+    const box = h('input', { type: 'checkbox', checked: S.selected.has(a.id), 'aria-label': `Выбрать ${a.name}` });
+    box.onchange = () => {
+      if (box.checked) S.selected.add(a.id); else S.selected.delete(a.id);
+      box.closest('.account-card')?.classList.toggle('selected', box.checked);
+      renderSelection(); renderHealthBar();
+    };
+    return h('label', { class: 'select-box', title: 'Выбрать для массовых действий' }, box);
+  }
+
+  function renderSelection() {
+    const count = S.selected.size;
+    selectionBar.hidden = !count;
+    if (!count) { fill(selectionBar); return; }
+    const accounts = selectedAccounts();
+    const quick = quickShareConfig(ctx);
+    const started = (key) => (job) => { S[key] = job; S.hidden.delete(job?.id); renderBatch(); };
+    fill(selectionBar,
+      h('div', { class: 'row' }, h('b', null, `Выбрано РК: ${count}`), h('span', { class: 'spacer' }),
+        h('button', { class: 'linklike', type: 'button', onclick: () => { for (const a of visibleAccounts()) S.selected.add(a.id); render(); } }, 'все видимые'),
+        h('button', { class: 'linklike', type: 'button', onclick: () => { S.selected.clear(); render(); } }, 'снять')),
+      h('div', { class: 'row wrap sel-actions' },
+        quick.targets.length ? h('button', { class: 'btn sm primary', type: 'button', title: 'Расшарить с сохранёнными правами и получателями', onclick: () => quickShare(ctx, accounts, { onStarted: started('shareJob') }) }, icon('zap', 13), `→ ${quick.label}`) : null,
+        h('button', { class: `btn sm${quick.targets.length ? '' : ' primary'}`, type: 'button', onclick: () => openShareSheet(ctx, { accounts, onStarted: started('shareJob') }) }, icon('send', 13), quick.targets.length ? 'Выбрать BC…' : 'Расшарить в BC'),
+        h('button', { class: 'btn sm', type: 'button', onclick: () => openTransferSheet(ctx, { accounts, onStarted: started('batchJob') }) }, icon('swap', 13), 'Передать'),
+        h('button', { class: 'btn sm', type: 'button', onclick: () => openPortfolioSheet(ctx, { accounts, onStarted: started('batchJob') }) }, icon('card', 13), 'Общая карта'),
+        h('button', { class: 'btn sm', type: 'button', disabled: healthRunning(), onclick: () => startHealth([...S.selected], true) }, icon('shield', 13), 'Проверить'),
+        h('button', { class: 'btn sm', type: 'button', title: 'Выключить/включить, переименовать, изменить бюджет у кампаний, адсетов, объявлений', onclick: () => openObjectsSheet(ctx, { accounts: accounts.map(({ id, name }) => ({ id, name })) }) }, icon('layers', 13), 'Кампании…'),
+        h('button', { class: 'btn sm', type: 'button', onclick: async () => { if (await copyText([...S.selected].join('\n'))) toast(`Скопировано ID: ${count}`, 'ok'); } }, icon('copy', 13), 'ID')));
+  }
+
+  function renderBatch() {
+    const fresh = (job) => job && !S.hidden.has(job.id) && (['running', 'needs-user'].includes(job.state) || Date.now() - (job.completedAt || job.startedAt || 0) < 30 * 60 * 1000);
+    fill(batchBox,
+      fresh(S.shareJob) ? shareJobBlock(S.shareJob, {
+        onResume: async () => { try { S.shareJob = await bus.share.resume(); toast('Повторяю шаринг', 'ok'); } catch (error) { toast(error.message, 'error', 7000); } renderBatch(); },
+        onOpen: async () => { try { await bus.share.openLast(); if (ctx.mode === 'popup') window.close(); } catch (error) { toast(error.message, 'error'); } }
+      }) : null,
+      fresh(S.batchJob) ? batchJobBlock(S.batchJob, {
+        onOpen: async () => { try { await bus.access.openLast(); if (ctx.mode === 'popup') window.close(); } catch (error) { toast(error.message, 'error'); } },
+        onHide: () => { S.hidden.add(S.batchJob.id); renderBatch(); }
+      }) : null);
   }
 
   /* ---------- быстрые переходы ---------- */
@@ -138,8 +284,9 @@ export function mountOverview(root, ctx) {
     const current = a.id === ctx.account;
     const pinned = Boolean(m?.pinned);
     const iconBtn = (name, title, onclick, extra = {}) => h('button', { class: `icon-btn${extra.warn ? ' warn' : ''}`, type: 'button', title, 'aria-label': title, onclick, ...extra.attrs }, icon(name, 15));
-    return h('section', { class: `card account-card state-${a.state}${current ? ' current' : ''}`, dataset: { id: a.id } },
+    return h('section', { class: `card account-card state-${a.state}${current ? ' current' : ''}${S.selected.has(a.id) ? ' selected' : ''}`, dataset: { id: a.id } },
       h('div', { class: 'card-head' },
+        selectBox(a),
         h('div', { class: 'item-main' },
           h('div', { class: 'item-title' }, a.name, current ? h('span', { class: 'pill cyan' }, 'текущий') : null),
           h('div', { class: 'item-meta' },
@@ -152,6 +299,7 @@ export function mountOverview(root, ctx) {
       a.error ? h('div', { class: 'alert err' }, icon('alert', 14), h('div', null, a.error)) : null,
       a.reasons?.length ? h('div', { class: 'ov-reasons' }, a.reasons.map((r) => h('span', { class: `pill ${r.kind === 'balance' ? 'err' : 'warn'}` }, r.count > 1 ? `${r.text} ×${r.count}` : r.text))) : null,
       m?.note ? h('p', { class: 'ov-note' }, m.note) : null,
+      healthBlock(a),
       !a.error && a.totalCampaigns ? h('div', { class: 'overview-kpis' },
         h('span', null, h('b', null, a.totalCampaigns), ' камп.'), h('span', null, h('b', null, a.deliveringCampaigns), ' работают'),
         h('span', null, h('b', null, a.problemCampaigns), ' проблем'), h('span', null, h('b', null, money(a.spend, a.currency)), ' расход')) : null,
@@ -185,13 +333,19 @@ export function mountOverview(root, ctx) {
 
   function visibleAccounts() {
     if (!S.data) return [];
-    return sortAccounts(filterAccounts(S.data.accounts, { filter: ov().filter, q: S.q }, meta()), ov().sort, meta());
+    const filter = ov().filter, byHealth = HEALTH_FILTER_IDS.has(filter);
+    let list = filterAccounts(S.data.accounts, { filter: byHealth ? 'all' : filter, q: S.q }, meta());
+    if (byHealth) list = list.filter((a) => healthFor(a).flags.includes(filter));
+    return sortAccounts(list, ov().sort, meta());
   }
 
   function renderChips() {
     const counts = S.data ? countAccounts(S.data.accounts) : { all: 0, issues: 0, working: 0, off: 0 };
+    const flags = S.data ? countFlags(S.data.accounts.map(healthFor)) : { checked: 0 };
     fill(chips, FILTERS.map(([id, title]) => h('button', { class: `chip${ov().filter === id ? ' on' : ''}${id === 'issues' && counts.issues ? ' warn' : ''}`, type: 'button', 'aria-pressed': String(ov().filter === id),
-      onclick: () => { setPref({ filter: id }); render(); } }, title, h('b', null, counts[id]))));
+      onclick: () => { setPref({ filter: id }); render(); } }, title, h('b', null, counts[id]))),
+    flags.checked ? HEALTH_FILTERS.filter(([id]) => flags[id] || ov().filter === id).map(([id, title]) => h('button', { class: `chip${ov().filter === id ? ' on' : ''} warn`, type: 'button', 'aria-pressed': String(ov().filter === id),
+      onclick: () => { setPref({ filter: ov().filter === id ? 'all' : id }); render(); } }, title, h('b', null, flags[id] || 0))) : null);
   }
 
   function renderSummary() {
@@ -241,7 +395,7 @@ export function mountOverview(root, ctx) {
 
   function render() {
     if (stopped) return;
-    renderQuick(); renderToolbar(); renderChips(); renderSummary(); renderCards(); renderFoot();
+    renderQuick(); renderHealthBar(); renderToolbar(); renderChips(); renderSummary(); renderBatch(); renderCards(); renderSelection(); renderFoot();
     searchRow.hidden = !S.data;
     chips.hidden = !S.data;
   }
@@ -252,8 +406,8 @@ export function mountOverview(root, ctx) {
     const list = visibleAccounts();
     if (!list.length) { toast('Нечего экспортировать', 'error'); return; }
     const stamp = new Date().toISOString().slice(0, 10);
-    if (kind === 'csv') download(`ttads-accounts-${stamp}.csv`, accountsToCsv(list, meta()), 'text/csv;charset=utf-8');
-    else download(`ttads-accounts-${stamp}.json`, JSON.stringify({ exportedAt: new Date().toISOString(), period: S.data.period, from: S.data.st, to: S.data.et, accounts: list.map((a) => ({ ...a, meta: meta()[a.id] ?? null })) }, null, 2), 'application/json');
+    if (kind === 'csv') download(`ttads-accounts-${stamp}.csv`, accountsToCsv(list, meta(), HEALTH_COLUMNS, healthFor), 'text/csv;charset=utf-8');
+    else download(`ttads-accounts-${stamp}.json`, JSON.stringify({ exportedAt: new Date().toISOString(), period: S.data.period, from: S.data.st, to: S.data.et, accounts: list.map((a) => ({ ...a, meta: meta()[a.id] ?? null, health: healthFor(a) })) }, null, 2), 'application/json');
     toast('Файл сохранён', 'ok');
   }
 
@@ -279,7 +433,32 @@ export function mountOverview(root, ctx) {
   bus.pipeline.status().then((job) => { if (!stopped) { S.quickJob = job; renderQuick(); } }).catch(() => {});
   const unwatchQuick = bus.watch(['pipelineJob'], (key, job) => { if (!stopped) { S.quickJob = job; renderQuick(); } });
   bus.overview.cached().then((cached) => { if (cached && !S.data && !stopped) { S.data = cached; render(); } }).catch(() => {});
+  Promise.all([bus.health.cached().catch(() => null), bus.health.status().catch(() => null), bus.share.status().catch(() => null), bus.access.status().catch(() => null)])
+    .then(([cache, job, shareJob, accessJob]) => {
+      if (stopped) return;
+      if (cache) S.health = cache;
+      S.healthJob = job; S.shareJob = shareJob; S.batchJob = accessJob;
+      render();
+    });
+  // Во время проверки кэш меняется после каждого РК: перерисовка не чаще раза в 400 мс и без сброса редактора заметки.
+  let healthTimer = null;
+  const scheduleHealthRender = () => {
+    clearTimeout(healthTimer);
+    healthTimer = setTimeout(() => {
+      if (stopped || unmountExplorer) return;
+      const el = document.activeElement;
+      if (el && cards.contains(el) && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.type !== 'checkbox') { renderHealthBar(); renderBatch(); return; }
+      render();
+    }, 400);
+  };
+  const unwatchHealth = bus.watch(['healthCache', 'healthJob', 'shareLastJob', 'accessLastJob'], (key, value) => {
+    if (key === 'healthCache') S.health = value || { accounts: {}, bcs: {} };
+    else if (key === 'healthJob') S.healthJob = value;
+    else if (key === 'shareLastJob') S.shareJob = value;
+    else S.batchJob = value;
+    scheduleHealthRender();
+  });
   load();
 
-  return () => { stopped = true; S.seq += 1; unmountExplorer?.(); stopTab(); unwatchQuick(); };
+  return () => { stopped = true; S.seq += 1; clearTimeout(healthTimer); unmountExplorer?.(); stopTab(); unwatchQuick(); unwatchHealth(); };
 }

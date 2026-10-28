@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "TTAds Hub",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "minimum_chrome_version": "111",
-  "description": "TikTok Ads: РК и BC в один клик, общая карта и шаринг в другой BC, доступ и transfer, мониторинг, Manual, апелляции и S2S.",
+  "description": "TikTok Ads: статус, билл и карта по каждому РК, РК и BC в один клик, шаринг и transfer в другой BC, массовые вкл/выкл, имя и бюджет, мониторинг, Manual, апелляции и S2S.",
   "permissions": [
     "storage",
     "tabs",

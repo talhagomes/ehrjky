@@ -480,3 +480,35 @@ details.group .ids { padding: 8px 10px; font: 11px/1.5 var(--mono); color: var(-
 .created-row.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card-2)); }
 .created-row input { accent-color: var(--accent); width: 16px; height: 16px; }
 .share-pick { display: grid; gap: 6px; max-height: 170px; overflow-y: auto; padding: 8px 10px; margin-top: 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); }
+
+/* ---------- 1.6: статус / билл / карта, выбор РК, профили, перенос кампаний ---------- */
+.account-card .card-head .item-main { flex: 1; }
+.select-box { flex: none; display: inline-flex; align-self: flex-start; padding: 3px 2px 0 0; cursor: pointer; }
+.select-box input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.account-card.selected { border-color: color-mix(in srgb, var(--accent) 70%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.health-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.health-box { display: grid; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--card-2); border: 1px solid var(--line); }
+.health-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+.health-kv { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 12px; color: var(--muted); }
+.health-kv b { color: var(--text); font-weight: 650; }
+.health-kv .err-text b { color: var(--err); }
+.health-foot, .health-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.health-line { padding: 6px 10px; border-radius: var(--radius-sm); border: 1px dashed var(--line-2); }
+.ov-selection { position: sticky; bottom: 0; z-index: 6; display: grid; gap: 8px; padding: 10px 12px; border-radius: var(--radius); background: var(--card-3); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: var(--shadow); }
+.ov-selection[hidden] { display: none; }
+.sel-actions { gap: 6px; }
+.preset-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.preset-row:empty { display: none; }
+.copy-tree { display: grid; gap: 4px; max-height: 260px; overflow: auto; padding-right: 2px; }
+.copy-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--card-2); }
+.copy-row.selected { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.copy-row .item-main { flex: 1; }
+.copy-log { display: grid; gap: 4px; max-height: 220px; overflow: auto; font-size: 12px; }
+.copy-log .err-text, .copy-log .ok-text { display: block; }
+.ok-text { color: var(--ok); }
+.api-box { display: grid; gap: 8px; }
+
+.ex-line { display: flex; align-items: center; gap: 6px; }
+.ex-line .ex-main { flex: 1; min-width: 0; }
+.ex-line .select-box { padding-top: 0; align-self: center; }
+.sheet[data-kind="objects"] .sheet-foot { justify-content: flex-end; }
