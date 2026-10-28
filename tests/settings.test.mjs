@@ -56,3 +56,28 @@ test('имена конвейера: подстановки', () => {
   assert.equal(renderName('RK {date}-{rand}-{n}', { n: 3, rand: 'ABCD', now: new Date(2026, 9, 28, 9, 5) }), 'RK 1028-ABCD-3');
   assert.equal(renderName('{time}', { now: new Date(2026, 9, 28, 9, 5) }), '0905');
 });
+
+test('предупреждение о 2027: до даты считает дни, после — предупреждает', async () => {
+  const { sunsetNotice, MANUAL_API_SUNSET } = await import('../TTAds-Hub/background/lib/sunset.js');
+  assert.equal(MANUAL_API_SUNSET, Date.UTC(2027, 0, 1));
+  const before = sunsetNotice(Date.UTC(2026, 9, 28));
+  assert.equal(before.kind, 'info');
+  assert.equal(before.days, 65);
+  assert.match(before.text, /через 65 дн\./);
+  assert.match(before.text, /Sales, App Promotion и Lead Generation/);
+  const after = sunsetNotice(Date.UTC(2027, 0, 2));
+  assert.equal(after.kind, 'warn');
+  assert.equal(after.days, 0);
+  assert.doesNotMatch(after.text, /через \d+ дн/);
+  assert.equal(sunsetNotice(Date.UTC(2027, 0, 1) - 1).days, 1);
+});
+
+test('подпись переключателя Smart+: значение по умолчанию, чистка и ограничения', () => {
+  const d = normalizeSettings({});
+  assert.deepEqual(d.manual.smartLabels, ['Power your campaign with Smart+']);
+  const custom = normalizeSettings({ manual: { smartLabels: ['  Управляйте кампанией с помощью Smart+  ', '', 'x'.repeat(300)] } });
+  assert.equal(custom.manual.smartLabels[0], 'Управляйте кампанией с помощью Smart+');
+  assert.equal(custom.manual.smartLabels.length, 2);
+  assert.equal(custom.manual.smartLabels[1].length, 120);
+  assert.deepEqual(normalizeSettings({ manual: { smartLabels: [] } }).manual.smartLabels, ['Power your campaign with Smart+']);
+});
