@@ -3,7 +3,7 @@
 // повторно отправляем сохранение в той же сессии → перезагружаем черновик и показываем Manual.
 import { ORIGIN } from '../lib/constants.js';
 import { HubError, wait, accountFromUrl, parseAdsUrl, runInPage } from '../lib/page.js';
-import { log } from '../lib/storage.js';
+import { getSettings, log } from '../lib/storage.js';
 import {
   LOCAL_RECIPE, SAVE_PATH, SALES_APP_UNSUPPORTED, campaignKind, recipePatch, safeUrlParams, unsupportedUnifiedSalesApp
 } from './recipe.js';
@@ -108,9 +108,9 @@ async function completeCapture(capture) {
     await sdel(armedKey);
     const result = await applyCaptured(tabId, capture, kind);
     if (result?.error) {
-      // API-first: если TikTok сменил контракт save/replay, новый unified editor всё ещё позволяет
-      // безопасно выключить Smart+ в текущем черновике без открытия новой страницы.
-      const fallback = await inspectView(tabId, { account: capture.account, draft, objective: kind }, true).catch(() => null);
+      // API-first: если TikTok отверг сохранение (сменил контракт save/replay), новый unified editor всё ещё позволяет
+      // выключить Smart+ в текущем черновике без открытия новой страницы.
+      const fallback = apiSaveFailed(result) ? await inspectView(tabId, { account: capture.account, draft, objective: kind }, true).catch(() => null) : null;
       if (fallback?.shown) {
         await sdel(key('error', tabId));
         log('warn', 'manual', `API переключения изменился; Manual включён через unified Smart+ switch (${result.error})`);
@@ -150,7 +150,7 @@ async function saveDraft(tabId, capture, ctx) {
   checkDraftTab(tab.url, ctx);
   const form = capture?.body?.campaign_sketch_form_data;
   if (String(form?.campaign_sketch_id) !== ctx.draft || form?.campaign_id || !form?.campaign_snap_id) throw new HubError('Данные черновика не совпадают.');
-  if (unsupportedUnifiedSalesApp(tab.url, ctx, LOCAL_RECIPE, form)) throw new HubError(SALES_APP_UNSUPPORTED);
+  if (unsupportedUnifiedSalesApp(tab.url, ctx, LOCAL_RECIPE, form)) throw new HubError(SALES_APP_UNSUPPORTED, 'unsupported');
 
   const patch = recipePatch(capture.body, LOCAL_RECIPE, ctx.objective);
   if (patch.changed) {
@@ -167,8 +167,10 @@ async function saveDraft(tabId, capture, ctx) {
         body: JSON.stringify(patch.body)
       });
       result = await response.json();
+    } catch (e) {
+      throw new HubError(`Не удалось отправить сохранение черновика: ${e?.name === 'AbortError' ? 'TikTok не ответил вовремя' : (e?.message || 'ошибка сети')}`, 'save');
     } finally { clearTimeout(timer); }
-    if (!response.ok || result?.code !== 0) throw new HubError(`TikTok отклонил сохранение черновика: ${result?.msg || response.status}`);
+    if (!response.ok || result?.code !== 0) throw new HubError(`TikTok отклонил сохранение черновика: ${result?.msg || response.status}`, 'save');
     if (String(result?.data?.campaign_sketch_id) !== ctx.draft) throw new HubError('TikTok вернул другой черновик.');
   }
   const latest = await chrome.tabs.get(tabId);
@@ -210,9 +212,13 @@ async function applyCaptured(tabId, capture, hint = null) {
     log('info', 'manual', `Черновик ${ctx.draft} (${objective}) переключён на Manual${saved.replayed ? '' : ' (флаги уже были выставлены)'}`);
     return { ok: true, viewPending: true };
   } catch (e) {
-    return { error: e?.message || 'Не удалось переключить на Manual.' };
+    return { error: e?.message || 'Не удалось переключить на Manual.', code: e?.code || 'error' };
   }
 }
+
+// Запасной путь через переключатель Smart+ нужен, только когда TikTok отверг или не принял сохранение черновика (контракт изменился).
+// Остальные отказы (защита Sales → App, другая цель или черновик, закрытая вкладка) обходить нельзя: черновик остаётся как есть.
+export const apiSaveFailed = (result) => Boolean(result?.error) && result.code === 'save';
 
 /* ---------- Состояние и действия, доступные из интерфейса ---------- */
 
@@ -221,9 +227,11 @@ async function inspectGoal(tabId) {
 }
 
 async function inspectView(tabId, ctx, click) {
+  const labels = (await getSettings().catch(() => null))?.manual?.smartLabels;
+  const context = { ...ctx, labels };
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const result = await runInPage(tabId, manualView, [ctx, click]);
+      const result = await runInPage(tabId, manualView, [context, click]);
       if (result) return result;
     } catch (e) { if (attempt === 2) throw e; }
     if (attempt < 2) { try { await waitStable(tabId, 3000); } catch { /* повторим */ } await wait(500); }
@@ -375,7 +383,7 @@ async function startActivation(tabId, tabUrl) {
     try {
       const result = await applyCaptured(tabId, capture);
       if (result?.error) {
-        const fallback = await inspectView(tabId, { account: state.account, draft: state.draft }, true).catch(() => null);
+        const fallback = apiSaveFailed(result) ? await inspectView(tabId, { account: state.account, draft: state.draft }, true).catch(() => null) : null;
         if (fallback?.shown) {
           await sdel(key('error', tabId));
           log('warn', 'manual', `API переключения изменился; Manual включён через unified Smart+ switch (${result.error})`);

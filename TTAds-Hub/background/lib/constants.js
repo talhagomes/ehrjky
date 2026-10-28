@@ -19,6 +19,9 @@ export const DEFAULT_LABELS = Object.freeze([
   'Настраиваемая вручную кампания'
 ]);
 
+// Подпись переключателя Smart+ в новом редакторе TikTok; для другого языка интерфейса список дополняется в настройках.
+export const DEFAULT_SMART_LABELS = Object.freeze(['Power your campaign with Smart+']);
+
 export const APPEAL_REASONS = Object.freeze([
   { value: 1, en: "I don't think there's a violation", ru: 'Я не считаю, что есть нарушение' },
   { value: 2, en: 'Rejection reasons too vague', ru: 'Причины отклонения слишком расплывчатые' },

@@ -43,18 +43,33 @@ export async function manualView(ctx, click) {
     const r = e.getBoundingClientRect(), s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
   };
+  // Подпись переключателя Smart+: по умолчанию английская, для другого языка интерфейса её добавляют в настройках (ctx.labels).
+  const configured = (Array.isArray(ctx.labels) ? ctx.labels : []).map((label) => String(label).trim().toLowerCase()).filter(Boolean);
+  const labels = configured.length ? configured : ['power your campaign with smart+'];
+  const mentions = (node) => {
+    const text = `${node.getAttribute?.('aria-label') || ''} ${node.textContent || ''}`.toLowerCase();
+    return labels.some((label) => text.includes(label));
+  };
+  // Переключатель определяет ближайшая к нему подпись: если в общем контейнере есть другие switch (бюджет и т. п.),
+  // нажимается тот, у которого подпись ближе; при равенстве — первый в документе.
+  const findSmartSwitch = () => {
+    let best = null, bestDepth = Infinity;
+    for (const candidate of document.querySelectorAll('[role="switch"]')) {
+      if (!visible(candidate)) continue;
+      let node = candidate;
+      for (let depth = 0; node && depth < 5; depth += 1, node = node.parentElement) {
+        if (!mentions(node)) continue;
+        if (depth < bestDepth) { best = candidate; bestDepth = depth; }
+        break;
+      }
+    }
+    return best;
+  };
   let clicked = false;
   const deadline = Date.now() + (click ? 25000 : 0);
   do {
     if (!onDraft()) return { error: 'Вкладка переключилась на другой черновик.' };
-    const smartSwitch = Array.from(document.querySelectorAll('[role="switch"]')).find((e) => {
-      if (!visible(e)) return false;
-      let parent = e;
-      for (let depth = 0; parent && depth < 5; depth += 1, parent = parent.parentElement) {
-        if (/Power your campaign with Smart\+/i.test(parent.textContent || '')) return true;
-      }
-      return false;
-    });
+    const smartSwitch = findSmartSwitch();
     if (smartSwitch) {
       const input = smartSwitch.matches('input') ? smartSwitch : smartSwitch.querySelector('input[type="checkbox"]');
       const enabled = Boolean(input?.checked || smartSwitch.getAttribute('aria-checked') === 'true' || smartSwitch.classList.contains('is-checked'));

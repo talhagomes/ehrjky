@@ -1,5 +1,5 @@
 import {
-  DEFAULT_AUTOMATION_FIELDS, DEFAULT_LABELS, DEFAULT_APPEAL_TEXT, PERIODS, MONITOR_INTERVALS, HEALTH_INTERVALS, META_COLORS, DEFAULT_NAME_TEMPLATES
+  DEFAULT_AUTOMATION_FIELDS, DEFAULT_LABELS, DEFAULT_SMART_LABELS, DEFAULT_APPEAL_TEXT, PERIODS, MONITOR_INTERVALS, HEALTH_INTERVALS, META_COLORS, DEFAULT_NAME_TEMPLATES
 } from './constants.js';
 import { normalizeLinksSettings, DEFAULT_LINKS_SETTINGS } from '../links/catalog.js';
 
@@ -8,7 +8,7 @@ const JOURNAL_KEY = 'journal';
 const JOURNAL_LIMIT = 300;
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  manual: { autoClick: false, labels: [...DEFAULT_LABELS], fields: [...DEFAULT_AUTOMATION_FIELDS] },
+  manual: { autoClick: false, labels: [...DEFAULT_LABELS], smartLabels: [...DEFAULT_SMART_LABELS], fields: [...DEFAULT_AUTOMATION_FIELDS] },
   appeals: {
     concurrency: 3,
     reason: 1,
@@ -129,6 +129,7 @@ export function normalizeSettings(raw = {}) {
     manual: {
       autoClick: m.autoClick === true,
       labels: strList(m.labels, d.manual.labels),
+      smartLabels: strList(m.smartLabels, d.manual.smartLabels, 20).map((label) => label.slice(0, 120)),
       fields: strList(m.fields, d.manual.fields, 100).filter((x) => /^[A-Za-z0-9_]{1,80}$/.test(x))
     },
     appeals: {

@@ -2,7 +2,7 @@ import { h, clear, toast, download } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import * as bus from '../lib/bus.js';
 import { openSheet, closeSheet } from '../lib/sheet.js';
-import { APPEAL_REASONS, DEFAULT_LABELS, DEFAULT_AUTOMATION_FIELDS, MONITOR_INTERVALS, HEALTH_INTERVALS, VERSION } from '../../background/lib/constants.js';
+import { APPEAL_REASONS, DEFAULT_LABELS, DEFAULT_SMART_LABELS, DEFAULT_AUTOMATION_FIELDS, MONITOR_INTERVALS, HEALTH_INTERVALS, VERSION } from '../../background/lib/constants.js';
 import { buildDiagnostics } from '../lib/diagnostics.js';
 import { openLearnSheet } from './objects.js';
 import { DEFAULT_FAVORITES } from '../../background/links/catalog.js';
@@ -78,6 +78,8 @@ export function openSettings(ctx) {
   /* ---------- Manual / апелляции ---------- */
   const labels = h('textarea', { class: 'textarea mono', rows: '6', spellcheck: 'false' });
   labels.value = (draft.manual.labels ?? DEFAULT_LABELS).join('\n');
+  const smartLabels = h('textarea', { class: 'textarea mono', rows: '3', spellcheck: 'false' });
+  smartLabels.value = (draft.manual.smartLabels ?? DEFAULT_SMART_LABELS).join('\n');
   const fields = h('textarea', { class: 'textarea mono', rows: '5', spellcheck: 'false' });
   fields.value = (draft.manual.fields ?? DEFAULT_AUTOMATION_FIELDS).join('\n');
   const concurrency = h('input', { class: 'input', type: 'number', min: '1', max: '6', value: draft.appeals.concurrency ?? 3 });
@@ -145,6 +147,8 @@ export function openSettings(ctx) {
     section('Manual / MNL'),
     field('Метки для автоклика (по одной в строке)', labels, 'Совпадение по части текста, без учёта регистра.'),
     h('button', { class: 'btn sm ghost', type: 'button', style: { justifySelf: 'start' }, onclick: () => { labels.value = DEFAULT_LABELS.join('\n'); } }, 'Метки по умолчанию'),
+    field('Подпись переключателя Smart+ (по одной в строке)', smartLabels, 'Текст рядом с переключателем «Power your campaign with Smart+» в редакторе кампании. Если TikTok открыт не на английском, добавьте подпись на своём языке — иначе «Включить Manual» не найдёт переключатель и ничего не нажмёт.'),
+    h('button', { class: 'btn sm ghost', type: 'button', style: { justifySelf: 'start' }, onclick: () => { smartLabels.value = DEFAULT_SMART_LABELS.join('\n'); } }, 'Подпись по умолчанию'),
     field('Поля автоматизации для перехвата (по одному в строке)', fields, 'Значения 1/true у этих ключей заменяются на 0/false. Применяется при следующем включении MNL.'),
     h('button', { class: 'btn sm ghost', type: 'button', style: { justifySelf: 'start' }, onclick: () => { fields.value = DEFAULT_AUTOMATION_FIELDS.join('\n'); } }, 'Поля по умолчанию'),
     section('Апелляции'),
@@ -172,7 +176,7 @@ export function openSettings(ctx) {
   save.addEventListener('click', async () => {
     const payload = {
       ...draft,
-      manual: { ...draft.manual, labels: labels.value.split('\n'), fields: fields.value.split('\n') },
+      manual: { ...draft.manual, labels: labels.value.split('\n'), smartLabels: smartLabels.value.split('\n'), fields: fields.value.split('\n') },
       appeals: { ...draft.appeals, concurrency: Number(concurrency.value), reason: Number(reason.value) },
       links: { ...(ctx.settings?.links ?? {}), ...draft.links },
       accounts: ctx.settings?.accounts, overview: ctx.settings?.overview
