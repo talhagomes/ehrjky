@@ -195,24 +195,61 @@ export function buildRequest(variant, { aadvid, id, value }) {
   return { path: variant.path, query: [...variant.query, ['aadvid', String(aadvid)]], headers: variant.headers, body, riskInfo: variant.riskInfo };
 }
 
+/* ---------- срок жизни и отключение контрактов ---------- */
+
+// TikTok меняет внутренние запросы без предупреждения: через 14 дней интерфейс просит учесть возраст, а при признаках
+// изменения (404/405, массовые отказы параметров, «ок» без эффекта) контракт отключается и требует нового обучения.
+export const CONTRACT_STALE_MS = 14 * 24 * 60 * 60 * 1000;
+export const INVALID_REASONS = Object.freeze({
+  schema: 'TikTok изменил адрес запроса (HTTP 404/405)',
+  validation: 'TikTok стал отклонять параметры запроса',
+  'no-effect': 'TikTok отвечает «ок», но объекты не меняются'
+});
+
+// Где хранится вариант контракта для действия: endpoint и ключ варианта.
+export function locate(level, action) {
+  if (action === 'enable' || action === 'disable') return { endpoint: `${level}.status`, key: action };
+  if (action === 'rename') return { endpoint: `${level}.name`, key: 'set' };
+  if (action === 'budget') return { endpoint: `${level}.budget`, key: 'set' };
+  return null;
+}
+
+// state: missing | ready | stale | invalid. Устаревший контракт ещё работает, отключённый — нет.
+export function contractInfo(store, level, action, now = Date.now()) {
+  const where = locate(level, action);
+  const variant = where ? store?.[where.endpoint]?.variants?.[where.key] : null;
+  if (!variant) return { state: 'missing' };
+  const learnedAt = variant.at || 0;
+  if (variant.invalid) return { state: 'invalid', reason: String(variant.invalid.reason || ''), at: variant.invalid.at || 0, learnedAt };
+  const age = Math.max(0, now - learnedAt);
+  return { state: age > CONTRACT_STALE_MS ? 'stale' : 'ready', learnedAt, ageDays: Math.floor(age / 86400000) };
+}
+
+export function contractStates(store = {}, now = Date.now()) {
+  const out = {};
+  for (const level of LEVELS) out[level] = Object.fromEntries(['enable', 'disable', 'rename', 'budget'].map((action) => [action, contractInfo(store, level, action, now)]));
+  return out;
+}
+
 // store: { 'campaign.status': { variants: { enable, disable } }, 'campaign.name': { variants: { set } }, … }
 export function readiness(store = {}) {
   const out = {};
   for (const level of LEVELS) {
+    const usable = (variant) => Boolean(variant) && !variant.invalid;
     const status = store[`${level}.status`]?.variants || {};
     out[level] = {
-      enable: Boolean(status.enable), disable: Boolean(status.disable),
-      name: Boolean(store[`${level}.name`]?.variants?.set), budget: Boolean(store[`${level}.budget`]?.variants?.set)
+      enable: usable(status.enable), disable: usable(status.disable),
+      name: usable(store[`${level}.name`]?.variants?.set), budget: usable(store[`${level}.budget`]?.variants?.set)
     };
   }
   return out;
 }
 
+// Отключённый (invalid) вариант не возвращается: им нельзя пользоваться, пока действие не обучено заново.
 export function variantFor(store, level, action) {
-  if (action === 'enable' || action === 'disable') return store[`${level}.status`]?.variants?.[action] || null;
-  if (action === 'rename') return store[`${level}.name`]?.variants?.set || null;
-  if (action === 'budget') return store[`${level}.budget`]?.variants?.set || null;
-  return null;
+  const where = locate(level, action);
+  const variant = where ? store?.[where.endpoint]?.variants?.[where.key] : null;
+  return variant && !variant.invalid ? variant : null;
 }
 
 /* ---------- значения действий ---------- */
