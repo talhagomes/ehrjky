@@ -24,6 +24,18 @@ export function saveVariant(variant, key) {
 
 export const clearContracts = () => withLock(CONTRACTS, () => chrome.storage.local.remove(CONTRACTS));
 
+// Отключает вариант (не удаляет: форма запроса нужна для диагностики). Новое обучение заменяет вариант целиком.
+export function invalidateVariant(endpointId, key, reason) {
+  return withLock(CONTRACTS, async () => {
+    const store = await getContracts();
+    const variant = store[endpointId]?.variants?.[key];
+    if (!variant) return store;
+    variant.invalid = { at: Date.now(), reason: String(reason || 'unknown').slice(0, 40) };
+    await chrome.storage.local.set({ [CONTRACTS]: store });
+    return store;
+  });
+}
+
 export const getSession = async () => (await chrome.storage.local.get(LEARN))[LEARN] ?? null;
 export const setSession = (session) => (session ? chrome.storage.local.set({ [LEARN]: session }) : chrome.storage.local.remove(LEARN));
 export async function patchSession(patch) {
