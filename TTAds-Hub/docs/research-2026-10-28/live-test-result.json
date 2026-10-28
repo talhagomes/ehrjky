@@ -1,0 +1,57 @@
+{
+  "capturedAt": "2026-10-28T00:00:00+03:00",
+  "purpose": "Authorized disposable test of official TikTok Business Center creation flow",
+  "result": "success",
+  "company": {
+    "name": "Example Corp",
+    "id": "<id-8312ae>",
+    "selection": "existing"
+  },
+  "businessCenter": {
+    "name": "TTAds Hub DOM Test",
+    "id": "<id-7cf55d>",
+    "created": true
+  },
+  "advertiserAccount": {
+    "name": "TTAds Hub RK DOM Test",
+    "id": "<id-cbad6c>",
+    "created": true,
+    "adsManagerVerified": true,
+    "campaignCountObserved": 0
+  },
+  "postCreate": {
+    "path": "/account/payment-setup",
+    "queryKeys": [
+      "source",
+      "company_id",
+      "adv_id",
+      "bc_id",
+      "form_id",
+      "entry_point",
+      "account_biz_type",
+      "adv_name",
+      "is_ka",
+      "org_id"
+    ],
+    "paymentSetupConfirmed": true,
+    "paymentPortfolioId": "<id-ffa0c9>",
+    "billingOption": "Automatic payment",
+    "verifiedAfterConfirmation": true
+  },
+  "verifiedRoutes": [
+    "https://business.tiktok.com/account/create?source=TTBC_HOME",
+    "https://business.tiktok.com/account/payment-setup",
+    "https://ads.tiktok.com/i18n/manage/campaign?aadvid={advertiser_id}",
+    "https://ads.tiktok.com/i18n/account/payment?aadvid={advertiser_id}",
+    "https://business.tiktok.com/manage/financeRole?org_id={business_center_id}"
+  ],
+  "excluded": [
+    "passwords",
+    "OTP",
+    "cookies",
+    "session tokens",
+    "signed request query strings",
+    "card number or last4",
+    "unrelated transaction details"
+  ]
+}

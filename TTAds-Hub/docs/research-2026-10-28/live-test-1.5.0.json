@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-28",
+  "version": "1.5.0",
+  "businessCenters": {
+    "source": { "id": "<id-7cf55d>", "name": "TTAds Hub DOM Test" },
+    "recipient": { "id": "<id-c5da97>", "name": "Example Corp_<id-8312ae>" }
+  },
+  "accounts": [
+    { "id": "<id-cbad6c>", "name": "TTAds Hub RK DOM Test", "status": "Approved", "owner": "<id-7cf55d>", "eligibleForPartnerShare": true },
+    { "id": "<id-9f7ab7>", "name": "Example Corp0924", "status": "Approved", "owner": "<user>", "accessMode": "Request Access", "eligibleForPartnerShareFromSourceBc": false }
+  ],
+  "partnerFlow": {
+    "route": "/manage/company/partner",
+    "legacyRoute": "/manage/partner",
+    "lookupRequiresResolvedCard": true,
+    "finalControl": "Next",
+    "successText": "Add partner request sent.",
+    "request": {
+      "sourceBusinessCenterId": "<id-7cf55d>",
+      "targetBusinessCenterId": "<id-c5da97>",
+      "accountIds": ["<id-cbad6c>"],
+      "permission": "Admin",
+      "state": "Active",
+      "recipientControls": ["Decline", "Approve"],
+      "approved": true,
+      "verifiedSharedWithRecipient": true,
+      "verifiedRole": "Admin",
+      "reciprocalShareModal": {
+        "openedAutomatically": true,
+        "submitted": false,
+        "availableAccountIds": ["<id-6450ba>", "<id-f20ff1>"],
+        "permissions": ["Admin", "Operator", "Analyst"]
+      }
+    }
+  },
+  "creation": {
+    "mode": "existing-bc",
+    "businessCenterId": "<id-7cf55d>",
+    "adAccountName": "TTAds Hub 150 Live 1028",
+    "timezone": "(UTC+01:00) Madrid Time",
+    "submitted": true,
+    "advertiserId": "<id-294f41>",
+    "paymentSetupObserved": true,
+    "tiktokAccountLinkOptional": true,
+    "paymentPortfolio": {
+      "id": "<id-ffa0c9>",
+      "name": "Portfolio for Example Corp",
+      "type": "Advanced",
+      "autoSelected": true,
+      "budgetModeSelected": "Unlimited",
+      "confirmed": true,
+      "verifiedBy": "payment setup task disappeared while optional TikTok account linkage remained",
+      "proofFile": "payment-portfolio-new-rk-linked.png"
+    }
+  },
+  "payment": {
+    "portfolioIdPreviouslyVerified": "<id-ffa0c9>",
+    "currentRoute": "/manage/payment/v2",
+    "currentObservation": "infinite-spinner",
+    "consoleWarnings": ["[Garfish warning]: Package util is not found", "no questionnaire match"],
+    "consoleErrors": []
+  },
+  "validation": {
+    "javascript": { "count": 59, "invalid": 0 },
+    "json": { "count": 12, "invalid": 0 },
+    "smoke": "passed",
+    "e2e": "all-passed"
+  },
+  "secretsStored": false
+}

@@ -1,0 +1,69 @@
+{
+  "capturedAt": "2026-10-28",
+  "baseOrigin": "https://business.tiktok.com",
+  "security": {
+    "containsCredentials": false,
+    "containsSignedUrls": false,
+    "removedQueryKeys": ["msToken", "X-Bogus", "signature", "session tokens"],
+    "implementationRule": "Do not replay captured mutation requests or hardcode signatures. Use official UI/DOM or a documented TikTok API with its supported OAuth flow."
+  },
+  "evidenceLevels": {
+    "live-resource": "Observed as a network resource while using the current page",
+    "bundle-discovered": "Found in the current public JS bundle; request schema and availability may be scenario-dependent",
+    "live-mutation": "Observed when the authorized test object was created"
+  },
+  "endpoints": [
+    {"method": "GET", "path": "/passport/web/account/info/", "purpose": "Signed-in account summary", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/ab_test/?user_type=1&ab_feature=user_management", "purpose": "User-management experiments", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/self/config/", "purpose": "Business Center self-service configuration", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/self/timezones/", "purpose": "Timezone options", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v1/self-serve/config-content/regist/", "purpose": "Registration form/content configuration", "evidence": "live-resource", "mutation": false},
+    {"method": "POST", "path": "/api/v3/bm/workspace/feature_gates/batch/values", "purpose": "Batch feature-gate lookup", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v3/bm/organization/prefill/info/?aid=1583", "purpose": "Prefill data for onboarding", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v3/bm/bp/companies/", "purpose": "Companies accessible to current user", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/user/", "purpose": "Current Business Center user", "evidence": "live-resource", "mutation": false},
+    {"method": "POST", "path": "/pa/api/common/query/payment/query_features", "purpose": "Payment feature eligibility", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v1/self-serve/adv-account/get_tcc/?tcc_key=ads_i18n_language_list", "purpose": "Ads language configuration", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/bff/v3/bm/setting/toolbar?platform_type=1&org_id={org_id}", "purpose": "Business Center toolbar/navigation", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/organization/qualified/customer/currencies/?registered_country={ISO2}", "purpose": "Currencies for registered country", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v3/bm/bp/company/info/?company_id={company_id}&query_scene=0", "purpose": "Company details", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v3/bm/bp/orgs/?company_id={company_id}", "purpose": "Business Centers under Company", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v3/bm/organization/qualified/customer/currencies/?country={ISO2}", "purpose": "Qualified advertiser currencies", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v3/bm/feature/rollout/get/?feature_keys=bc_adv_currency_ratio&company_id={company_id}", "purpose": "Currency rollout/ratio feature", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/organization/name/?org_name={name}", "purpose": "Business Center name availability/validation", "evidence": "live-resource", "mutation": false},
+    {"method": "GET", "path": "/api/v3/bm/common/industry/info/sorted/?scene=1&version=400&levels=[1,2,3,4]", "purpose": "Full industry hierarchy", "evidence": "live-resource", "mutation": false},
+    {"method": "POST", "path": "/api/v3/bm/bp/create/", "purpose": "Business-platform creation orchestration", "evidence": "live-mutation", "mutation": true, "riskWrapped": true},
+    {"method": "POST", "path": "/pa/api/common/query/payment/query_need_payment_setup", "purpose": "Whether post-create payment setup is required", "evidence": "live-resource", "mutation": false},
+
+    {"method": "GET", "path": "/api/v2/bm/account/name/", "purpose": "Account name lookup/validation", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "POST", "path": "/api/v2/bm/company/search/", "purpose": "Company search", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/customer/city/config/", "purpose": "City/address configuration", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/industries/", "purpose": "Legacy industry list", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "POST", "path": "/api/v2/bm/organization/create/from/am/", "purpose": "Create Business Center from Ads Manager scenario", "evidence": "bundle-discovered", "mutation": true, "riskWrapped": true},
+    {"method": "GET", "path": "/api/v2/bm/organization/detail/", "purpose": "Business Center detail", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/organization/qualified/", "purpose": "Qualified Business Center status", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "POST", "path": "/api/v2/bm/organization/qualified/account/create/", "purpose": "Create advertiser account in qualified organization", "evidence": "bundle-discovered", "mutation": true, "riskWrapped": true},
+    {"method": "POST", "path": "/api/v2/bm/organization/qualified/create/", "purpose": "Create qualified organization", "evidence": "bundle-discovered", "mutation": true, "riskWrapped": true},
+    {"method": "GET", "path": "/api/v2/bm/payment/billing/group/bg_simple_list/", "purpose": "Simple billing-group/portfolio list", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/payment/billing/group/white_list/", "purpose": "Billing-group eligibility/allow-list", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/register_areas/", "purpose": "Available registration areas/countries", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/self/industry/", "purpose": "Industry config for current user", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v2/bm/tax/config/", "purpose": "Tax field configuration", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "POST", "path": "/api/v2/bm/tax/validate/", "purpose": "Tax data validation", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v3/bm/common/industry/info/map/", "purpose": "Industry map representation", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "POST", "path": "/api/v3/bm/organization/qualified/bc_with_adv/create/", "purpose": "Combined Business Center + advertiser creation", "evidence": "bundle-discovered", "mutation": true, "riskWrapped": true},
+    {"method": "GET", "path": "/api/v4/i18n/common/address_config/", "purpose": "International address schema", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "GET", "path": "/api/v4/i18n/common/billing_config/", "purpose": "International billing field configuration", "evidence": "bundle-discovered", "mutation": false},
+    {"method": "POST", "path": "/api/v4/i18n/common/billing_validate/", "purpose": "Billing-data validation", "evidence": "bundle-discovered", "mutation": false}
+  ],
+  "recommendedUse": {
+    "safeReadOnlyCandidates": [
+      "/api/v3/bm/bp/companies/",
+      "/api/v3/bm/bp/orgs/",
+      "/api/v2/bm/self/timezones/",
+      "/api/v3/bm/common/industry/info/sorted/",
+      "/api/v3/bm/organization/qualified/customer/currencies/"
+    ],
+    "mutations": "Keep behind the official page/DOM unless TikTok publishes a supported API contract for this product and account type."
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "generatedAt": "2026-10-28",
+  "extensionVersion": "1.5.0",
+  "evidence": ["live-ui", "extension-source", "public-runtime-bundles", "official-docs"],
+  "architecture": {
+    "officialApi": "Preferred for stable production CRUD and reporting; OAuth and advertiser permissions required.",
+    "sessionApi": "Free mode using the user's active TikTok session; version-sensitive.",
+    "dom": "Fallback and hosted flows for Business Center, protected payments, uploads, and UI-only actions."
+  },
+  "liveAdvertiser": {
+    "id": "<id-9f7ab7>",
+    "name": "Example Corp0924",
+    "warning": "Verify your phone number for security.",
+    "deliveryError": "Insufficient account balance. Add funds to resume delivery.",
+    "period": { "start": "2026-10-18", "end": "2026-10-25" },
+    "totals": {
+      "campaigns": 2,
+      "draftCampaigns": 2,
+      "spend": 8.97,
+      "currency": "EUR",
+      "impressions": 5653,
+      "clicks": 1115,
+      "ctr": 19.72,
+      "cpc": 0.01,
+      "cpm": 1.59,
+      "conversions": 201,
+      "costPerConversion": 0.04,
+      "cvr": 3.56
+    },
+    "campaigns": [
+      {
+        "name": "Копия 1 объекта «Трафик20261024005530»",
+        "delivery": "Not delivered",
+        "budgetDaily": 35.0,
+        "spend": 8.67,
+        "impressions": 3745,
+        "clicks": 1098,
+        "ctr": 29.32,
+        "conversions": 190,
+        "cvr": 5.07
+      },
+      {
+        "name": "Трафик20261024005530",
+        "delivery": "Not delivered",
+        "budgetDaily": 50.0,
+        "spend": 0.30,
+        "impressions": 1908,
+        "clicks": 17,
+        "ctr": 0.89,
+        "conversions": 11,
+        "cvr": 0.58
+      }
+    ]
+  },
+  "liveBusinessState": {
+    "sourceBusinessCenterId": "<id-7cf55d>",
+    "recipientBusinessCenterId": "<id-c5da97>",
+    "activeSharedAdvertiserId": "<id-cbad6c>",
+    "sharedRole": "Admin",
+    "newAdvertiserId": "<id-294f41>",
+    "newAdvertiserName": "TTAds Hub 150 Live 1028",
+    "autoSelectedPaymentPortfolioId": "<id-ffa0c9>",
+    "paymentPortfolioConfirmedForNewAdvertiser": true,
+    "paymentPortfolioVerification": "payment setup task disappeared; optional TikTok account linkage remained",
+    "paymentPortfolioProofFile": "payment-portfolio-new-rk-linked.png"
+  },
+  "tableSchemas": {
+    "campaign": ["onOff", "name", "status", "campaignBudget", "spend", "cpcDestination", "cpm", "impressions", "clicksDestination", "ctrDestination", "conversions", "costPerConversion", "cvr", "results", "costPerResult", "resultRate", "qualifiedConversion", "costPerQualifiedConversion", "qualifiedConversionRate"],
+    "adgroup": ["onOff", "name", "status", "adgroupId", "budget", "bid", "schedule", "attributionSettings", "spend", "cpcDestination", "cpm", "impressions", "clicksDestination", "ctrDestination", "conversions", "costPerConversion", "cvr", "results", "costPerResult", "resultRate", "qualifiedConversion", "costPerQualifiedConversion", "qualifiedConversionRate"],
+    "ad": ["onOff", "name", "status", "source", "adgroupId", "adgroupName", "adId", "spend", "cpcDestination", "cpm", "impressions", "clicksDestination", "ctrDestination", "conversions", "costPerConversion", "cvr", "results", "costPerResult", "resultRate", "qualifiedConversion", "costPerQualifiedConversion", "qualifiedConversionRate"]
+  },
+  "uiActions": {
+    "campaign": ["bulkEdit:name", "bulkEdit:budget", "bulkEdit:poNumber", "bulkEdit:replaceNegativeKeywords", "turnOn", "turnOff", "duplicate", "viewReport", "createSplitTest", "delete", "recommendations", "log", "rename"],
+    "ad": ["bulkEdit:name", "bulkEdit:creative", "bulkEdit:text", "bulkEdit:destinationLink", "turnOn", "turnOff", "duplicate", "preview", "delete", "viewReport", "edit"],
+    "importExport": ["exportAll", "exportFiltered", "exportSelected", "downloadLatestExport", "importAds", "downloadTemplate", "exportData"],
+    "other": ["labels", "automatedRules", "keyboardShortcuts"]
+  },
+  "capabilities": [
+    { "id": "objects.list", "levels": ["campaign", "adgroup", "ad"], "adapters": ["official-api", "session-api", "dom"], "sessionPath": "/api/v4/i18n/statistics/op/{level}/list/", "priority": "P0", "risk": "read" },
+    { "id": "objects.create", "levels": ["campaign", "adgroup", "ad"], "adapters": ["official-api", "dom"], "priority": "P1", "risk": "creates-draft-or-live-object" },
+    { "id": "objects.updateStatus", "levels": ["campaign", "adgroup", "ad"], "adapters": ["official-api", "session-api", "dom"], "sessionPaths": ["/api/v2/i18n/overture/campaign/update_status/", "/api/v3/i18n/overture/ad/update_status/", "/api/v2/i18n/overture/creative/update_status/"], "priority": "P0", "risk": "can-start-or-stop-spend" },
+    { "id": "objects.rename", "levels": ["campaign", "adgroup", "ad"], "adapters": ["official-api", "session-api", "dom"], "priority": "P0", "risk": "mutation" },
+    { "id": "objects.updateBudget", "levels": ["campaign", "adgroup"], "adapters": ["official-api", "session-api", "dom"], "priority": "P0", "risk": "changes-spend-limit" },
+    { "id": "objects.updateBidSchedule", "levels": ["adgroup"], "adapters": ["official-api", "session-api", "dom"], "priority": "P1", "risk": "changes-delivery" },
+    { "id": "objects.editCreative", "levels": ["ad"], "adapters": ["official-api", "session-api", "dom"], "sessionPath": "/api/v4/i18n/creation/patch/creative/", "priority": "P1", "risk": "may-trigger-review" },
+    { "id": "objects.duplicate", "levels": ["campaign", "adgroup", "ad"], "adapters": ["official-api", "dom", "bulk-file"], "priority": "P1", "risk": "creates-draft" },
+    { "id": "objects.delete", "levels": ["campaign", "adgroup", "ad", "draft"], "adapters": ["official-api", "session-api", "dom"], "priority": "P1", "risk": "permanent" },
+    { "id": "reports.query", "levels": ["advertiser", "campaign", "adgroup", "ad"], "adapters": ["official-api", "session-api"], "officialPaths": ["/report/integrated/get/", "/report/task/create/", "/report/task/check/", "/report/task/download/", "/report/task/cancel/"], "priority": "P0", "risk": "read" },
+    { "id": "bulk.importExport", "formats": ["CSV", "XLSX"], "adapters": ["dom", "bulk-file"], "priority": "P1", "risk": "bulk-mutation" },
+    { "id": "transfer.crossAdvertiser", "method": "export-import-or-recreate; not direct advertiser_id mutation", "adapters": ["official-api", "bulk-file", "dom"], "priority": "P1", "risk": "creates-new-objects" },
+    { "id": "sharing.partnerAssets", "route": "/manage/company/partner?org_id={bcId}", "permissions": ["Admin", "Operator", "Analyst"], "adapters": ["dom"], "priority": "P0", "risk": "permission-change" },
+    { "id": "advertiser.create", "route": "/account/create?source=TTBC_HOME", "adapters": ["dom"], "priority": "P0", "risk": "account-creation" },
+    { "id": "advertiser.requestAccess", "route": "/manage/accounts/adv?org_id={bcId}", "adapters": ["dom"], "priority": "P0", "risk": "permission-change" },
+    { "id": "billing.linkPortfolio", "route": "/account/payment-setup", "adapters": ["dom"], "priority": "P1", "risk": "financial-link" },
+    { "id": "billing.addPaymentMethod", "route": "/i18n/account/payment?aadvid={advertiserId}", "adapters": ["hosted-ui"], "priority": "P1", "risk": "stores-payment-method" },
+    { "id": "rules.manage", "adapters": ["official-api", "session-api", "dom"], "sessionPaths": ["/api/v3/i18n/optimizer/rule/list/", "/api/v3/i18n/optimizer/rule/batch_bind/"], "priority": "P1", "risk": "can-change-delivery-automatically" },
+    { "id": "moderation.appeal", "adapters": ["session-api", "dom"], "sessionPath": "/api/v4/i18n/creation/audit/appeal_creative/", "priority": "P1", "risk": "external-submission" },
+    { "id": "diagnostics.delivery", "adapters": ["session-api", "dom"], "sessionPaths": ["/api/v3/i18n/optimizer/diagnosis/v2/report/", "/api/v4/i18n/optimizer/rec/campaign/"], "priority": "P0", "risk": "read" }
+  ],
+  "metrics": {
+    "core": ["spend", "impressions", "reach", "frequency", "clicks", "destinationClicks", "ctr", "cpc", "cpm", "conversions", "realTimeConversions", "cvr", "cpa", "results", "costPerResult", "resultRate"],
+    "video": ["videoViews2s", "videoViews6s", "videoViews25", "videoViews50", "videoViews75", "videoViews100", "averageWatchTime"],
+    "commerce": ["purchases", "completePayment", "revenue", "roas"],
+    "quality": ["qualifiedConversion", "costPerQualifiedConversion", "qualifiedConversionRate", "learningPhase", "deliveryReason"]
+  },
+  "routes": {
+    "dashboard": "/i18n/dashboard?aadvid={advertiserId}",
+    "campaigns": "/i18n/manage/campaign?aadvid={advertiserId}",
+    "adgroups": "/i18n/manage/adgroup?aadvid={advertiserId}",
+    "ads": "/i18n/manage/creative?aadvid={advertiserId}",
+    "reports": "/i18n/reporting/list?aadvid={advertiserId}",
+    "billing": "/i18n/account/payment?aadvid={advertiserId}",
+    "accountSettings": "/i18n/verification-center/setting?aadvid={advertiserId}",
+    "events": "/i18n/events_manager/home?aadvid={advertiserId}",
+    "catalog": "/catalogs/insights?aadvid={advertiserId}",
+    "creativeLibrary": "/i18n/creative-library/dashboard?aadvid={advertiserId}",
+    "leads": "/lead_center/leads?aadvid={advertiserId}",
+    "audiences": "/i18n/sas/audience/adver/main?aadvid={advertiserId}",
+    "comments": "/i18n/material/comment/list?aadvid={advertiserId}",
+    "automatedRules": "/i18n/automated-rules-v2/management/manage?aadvid={advertiserId}",
+    "recommendations": "/i18n/recommendation-center?aadvid={advertiserId}",
+    "experiments": "/i18n/experiment-manager?aadvid={advertiserId}",
+    "audienceInsights": "/i18n/audience-insight?aadvid={advertiserId}",
+    "commentInsights": "/i18n/analysis/commentInsights?aadvid={advertiserId}",
+    "videoInsights": "/i18n/analysis/videoInsights?aadvid={advertiserId}",
+    "attribution": "/i18n/attribution-manager/insight/comparison?aadvid={advertiserId}",
+    "keywordPlanner": "/i18n/search_ads_center/keyword-planner/creation?aadvid={advertiserId}",
+    "negativeKeywords": "/i18n/search_ads_center/negative-keywords/list?aadvid={advertiserId}",
+    "partners": "/manage/company/partner?org_id={businessCenterId}",
+    "advertisersInBc": "/manage/accounts/adv?org_id={businessCenterId}",
+    "paymentManagement": "/manage/payment/v2?org_id={businessCenterId}"
+  },
+  "failureHandling": {
+    "mutationSuccessRule": "reread entity and verify desired state",
+    "financeSpinner": "timeout after 30-60 seconds, capture URL/text/logs, retry once, return needs-user",
+    "statusRule": "toggle ON is not delivery; evaluate primary status and delivery reason",
+    "idRule": "store all IDs as strings"
+  },
+  "unresolved": [
+    "Exact current bodies for internal status and batch mutations",
+    "Exact protected payment tokenization contract",
+    "Payment summary endpoint in the separately loaded finance application",
+    "Whether every future eligible advertiser can be auto-linked without a confirm step",
+    "Asset compatibility matrix for every objective during cross-advertiser copy"
+  ]
+}

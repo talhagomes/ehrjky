@@ -1,0 +1,71 @@
+{
+  "capturedAt": "2026-10-28",
+  "businessCenterRoute": "/manage/accounts/adv?org_id={business_center_id}",
+  "requestAccess": {
+    "entry": ["Accounts", "Advertiser accounts", "Add advertiser account", "Request Access"],
+    "ownershipChanges": false,
+    "ownerApprovalRequired": true,
+    "approvalLocation": "TikTok Ads Manager notifications, Business Center tab",
+    "fields": ["accountId", "permission", "assetSharingOptional"],
+    "permissions": {
+      "Admin": ["manage finance", "manage settings", "manage permissions", "create/edit campaigns", "view performance"],
+      "Operator": ["manage finance", "create/edit campaigns", "view performance"],
+      "Analyst": ["view ads", "view performance"]
+    },
+    "restriction": "Cannot request access to a disapproved advertiser account"
+  },
+  "ownershipTransfer": {
+    "entry": ["Accounts", "Advertiser accounts", "More", "Transfer advertiser accounts"],
+    "availability": "Eligible customers only",
+    "maxAccountsPerRequest": 30,
+    "recipientApprovalRequired": true,
+    "sourceRequirements": ["Business Center Admin", "source BC owns advertiser"],
+    "advertiserRequirements": ["auction account", "Approved", "no incompatible Shop qualification", "no pending transfer"],
+    "recipientRequirements": ["Approved BC", "not Creator Agency BC", "sufficient quota", "Payment Portfolio enabled", "matching currency"],
+    "blockingBillingConditions": [
+      "incomplete advertiser or billing data",
+      "unsupported Billing Sharing relationship",
+      "payment method or billing option change in progress",
+      "unsettled prepaid balance in shared Payment Portfolio",
+      "unpaid or unbilled Auto Pay invoices",
+      "active system punishment",
+      "prepaid billing-country restriction",
+      "conflicting financial asset settlement request"
+    ],
+    "funds": {
+      "crossCompany": "Funds do not transfer; remaining balance returns to the original Payment Portfolio/BC via refund process",
+      "sameCompany": "Funds normally remain; GMV Pay is disabled and must be re-enabled"
+    },
+    "assets": {
+      "owned": "Detach from source BC and move with advertisers",
+      "linked": "Pixels, catalogs, audiences, TikTok accounts, Shops and other linked assets do not automatically move without permissions"
+    }
+  },
+  "paymentPortfolio": {
+    "route": "/manage/financeRole?org_id={business_center_id}",
+    "rolesRequired": ["Business Center Admin", "Finance Manager"],
+    "accountRequirement": "Approved",
+    "bulkLinkEntry": ["Finance", "Payment management", "View details", "+Add accounts to link"],
+    "newAccountEntry": "Ad accounts not yet linked to Payment Portfolios -> Link now",
+    "shared": ["payment methods", "cash balance where eligible", "credit line where eligible"],
+    "notShared": ["ad credit"],
+    "liveTest": {
+      "businessCenterId": "<id-7cf55d>",
+      "advertiserId": "<id-cbad6c>",
+      "portfolioId": "<id-ffa0c9>",
+      "portfolioType": "Advanced",
+      "linked": true,
+      "billingOption": "Automatic payment",
+      "financeAccessVerified": true,
+      "paymentMethodCountObserved": 1,
+      "paymentManagementRoute": "/manage/payment/v2?org_id={business_center_id}"
+    }
+  },
+  "extension": {
+    "version": "1.4.0",
+    "storageKey": "accessLastJob",
+    "batchRequestAccessMax": 30,
+    "batchTransferMax": 30,
+    "sensitiveDataStored": false
+  }
+}

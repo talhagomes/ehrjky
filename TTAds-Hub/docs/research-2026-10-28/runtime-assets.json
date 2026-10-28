@@ -1,0 +1,31 @@
+{
+  "capturedAt": "2026-10-28",
+  "origin": "https://business.tiktok.com",
+  "note": "Public runtime assets observed on account/create or account/payment-setup. Host/CDN prefixes may change; paths are for code archaeology, not runtime pinning.",
+  "javascript": [
+    "user_management_account/static/js/main.46210f18.js",
+    "user_management_account/static/js/421.552e40f2.js",
+    "user_management_account/static/js/async/362.2bf0c422.js",
+    "user_management_account/static/js/async/874.14ea8e48.js",
+    "user_management_account/static/js/async/create/page.e45f3340.js",
+    "user_management_account/static/js/async/payment-setup/page.5603ebcd.js",
+    "user_management_vmok/static/js/async/__federation_expose_business_setup.b4aeae2a.js",
+    "business_center/vmok_components/static/js/async/embedded-bc-linkage.ff7658a0.js"
+  ],
+  "css": [
+    "user_management_account/static/css/421.689394fd.css",
+    "user_management_account/static/css/main.3dafc03f.css"
+  ],
+  "extractedContracts": {
+    "fieldEnums": "business-create-dom.json",
+    "endpointCatalog": "business-create-api-catalog.json",
+    "paymentRoute": "/account/payment-setup",
+    "paymentInitialTaskIds": ["linkage", "payment_setup"],
+    "completionCenterTemplate": "/create/completion-center?adv_id={adv_id}&bc_id={bc_id}&source={source}",
+    "postOnboardingDestinations": [
+      "/i18n/nb_creation?aadvid={adv_id}",
+      "/manage/overview?org_id={bc_id}"
+    ]
+  },
+  "excluded": ["signed resource query strings", "msToken", "X-Bogus", "cookies", "source maps not required for this handoff"]
+}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TTAds Hub</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="app" class="shell">
+    <header class="top">
+      <div class="brand">
+        <img class="logo" src="../assets/icon-48.png" alt="" width="30" height="30">
+        <div class="brand-text">
+          <h1>TTAds Hub</h1>
+          <p id="ctx-line" class="ctx">Определяю вкладку…</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="btn-account" class="chip-btn" type="button" hidden></button>
+        <button id="btn-journal" class="icon-btn" type="button" title="Журнал действий" aria-label="Журнал действий" aria-pressed="false"></button>
+        <button id="btn-window" class="icon-btn" type="button" title="Открыть в отдельном окне" aria-label="Открыть в отдельном окне"></button>
+        <button id="btn-settings" class="icon-btn" type="button" title="Настройки" aria-label="Настройки"></button>
+      </div>
+    </header>
+    <nav id="tabs" class="tabs" role="tablist" aria-label="Разделы"></nav>
+    <main id="view" class="view" role="tabpanel"></main>
+    <div id="sheet-host"></div>
+    <div id="toasts" aria-live="polite"></div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

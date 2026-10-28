@@ -1,0 +1,75 @@
+{
+  "manifest_version": 3,
+  "name": "TTAds Hub",
+  "version": "1.5.0",
+  "minimum_chrome_version": "111",
+  "description": "TikTok Ads: РК и BC в один клик, общая карта и шаринг в другой BC, доступ и transfer, мониторинг, Manual, апелляции и S2S.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "webRequest",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://ads.tiktok.com/*",
+    "https://business.tiktok.com/*",
+    "https://business-api.tiktok.com/*"
+  ],
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "action": {
+    "default_title": "TTAds Hub",
+    "default_popup": "ui/app.html",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "32": "assets/icon-32.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://ads.tiktok.com/*"
+      ],
+      "js": [
+        "content/interceptor.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://ads.tiktok.com/*"
+      ],
+      "js": [
+        "content/agent.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "optional_permissions": [
+    "notifications"
+  ],
+  "omnibox": {
+    "keyword": "tt"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+K",
+        "mac": "Alt+Shift+K"
+      },
+      "description": "Открыть TTAds Hub"
+    }
+  }
+}

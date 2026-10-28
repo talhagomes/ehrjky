@@ -1,0 +1,61 @@
+{
+  "capturedAt": "2026-10-28",
+  "model": {
+    "owner": "Payment Portfolio",
+    "relationship": "Payment Portfolio -> linked advertiser accounts",
+    "sharedResources": ["funds", "payment methods"],
+    "effect": "Changes to portfolio payment methods apply to all linked accounts",
+    "notAPropertyOf": ["browser login", "Business Center name", "individual campaign"]
+  },
+  "answers": {
+    "doesANewAdvertiserAutomaticallyGetTheCard": "Only if TikTok links/selects the same Payment Portfolio and payment setup is confirmed; creation alone is not sufficient.",
+    "canAnExistingCardBeUsedWithoutReenteringDetails": "Yes when the card already belongs to the selected Portfolio and TikTok allows the account to link it; additional verification can still be required.",
+    "whatIfNoCardExists": "The user must use the official Add payment method flow. The extension must not collect raw card details.",
+    "whatIfANewBusinessCenterUsesAnotherPortfolio": "It does not inherit payment methods from the old Portfolio.",
+    "whereToManageBcOwnedAccount": "Business Center Finance / Payment management; Ads Manager may show a read-only notice that payment methods are managed in the Portfolio."
+  },
+  "livePaymentSetup": {
+    "businessCenter": {"name": "TTAds Hub DOM Test", "id": "<id-7cf55d>"},
+    "advertiser": {"name": "TTAds Hub RK DOM Test", "id": "<id-cbad6c>"},
+    "companyId": "<id-8312ae>",
+    "selection": {
+      "selectExistingChecked": true,
+      "createNewDisabled": true,
+      "portfolio": {"name": "Portfolio for Example Corp", "type": "Advanced", "id": "<id-ffa0c9>"},
+      "budget": "Unlimited",
+      "billingOption": "Automatic payment",
+      "confirmEnabled": true
+    },
+    "status": "confirmed-and-linked",
+    "confirmedAt": "2026-10-28",
+    "result": "Payment setup section disappeared after Confirm; Ads Manager shows Payment Portfolio Advanced"
+  },
+  "adsManagerObservation": {
+    "portfolioLabel": "Payment Portfolio Advanced",
+    "paymentMethodsMessage": "Payment methods are managed in the Payment Portfolio, and any changes apply to all linked accounts.",
+    "availableCashBalanceObserved": "0.00 EUR",
+    "automaticPaymentScheduleObserved": "Nov 1, 2026 or when ad spending reaches 5.00 EUR",
+    "spendObserved": "0.00 EUR",
+    "budgetObserved": "Unlimited",
+    "sensitivePaymentDetailsIncluded": false
+  },
+  "automationContract": {
+    "detectPath": "/account/payment-setup",
+    "queryIds": {"company": "company_id", "businessCenter": ["bc_id", "org_id"], "advertiser": ["adv_id", "aadvid"]},
+    "readOnlyInspection": ["selected portfolio name/id/type", "billing option", "budget", "confirm availability"],
+    "mutation": "Click the enabled Confirm in the Payment setup section only after an explicit user click in the extension.",
+    "stopConditions": [
+      "No existing Portfolio ID is visible",
+      "BC/advertiser IDs do not match the creation job",
+      "Confirm is disabled or missing",
+      "TikTok shows an error, CAPTCHA, identity or payment verification"
+    ],
+    "neverCollect": ["PAN/card number", "CVV", "OTP", "3DS code", "cookies", "session tokens"]
+  },
+  "officialSources": [
+    "https://ads.tiktok.com/resources/help/article/how-to-use-payment-portfolio",
+    "https://ads.tiktok.com/help/article/about-payment-portfolio?lang=en",
+    "https://ads.tiktok.com/help/article/set-up-automatic-payment",
+    "https://ads.tiktok.com/resources/help/article/add-a-payment-method-for-automatic-payment-in-tiktok-ads-manager?lang=en-GB"
+  ]
+}

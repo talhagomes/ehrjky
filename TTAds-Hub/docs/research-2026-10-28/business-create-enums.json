@@ -1,0 +1,77 @@
+{
+  "capturedAt": "2026-10-28",
+  "dynamicSourcePolicy": "Fetch live lists for the current Company/country. These observed values are a fallback/reference, not a universal allow-list.",
+  "countriesObserved": [
+    "Argentina", "Australia", "Austria", "Azerbaijan", "Bahrain", "Bangladesh", "Belarus", "Belgium", "Bolivia (Plurinational State of)", "Brazil", "Bulgaria", "Cambodia", "Canada", "Chile", "China Outbound", "Colombia", "Costa Rica", "Croatia", "Czechia", "Denmark", "Dominican Republic", "Ecuador", "Egypt", "Estonia", "Finland", "France", "Germany", "Greece", "Guatemala", "Hong Kong", "Hungary", "India", "Indonesia", "Iraq", "Ireland", "Israel", "Italy", "Japan", "Jordan", "Kazakhstan", "Kenya", "Korea", "Kuwait", "Latvia", "Lebanon", "Lithuania", "Malaysia", "Mexico", "Morocco", "Netherlands", "New Zealand", "Nigeria", "Norway", "Oman", "Pakistan", "Panama", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Puerto Rico", "Qatar", "Romania", "Russia", "San Marino", "Saudi Arabia", "Serbia", "Singapore", "Slovakia", "Slovenia", "South Africa", "Spain", "Sri Lanka", "Sweden", "Switzerland", "Taiwan", "Thailand", "Turkey", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Vietnam"
+  ],
+  "currenciesObservedForSpainFlow": ["EUR", "USD", "GBP", "SEK", "DKK", "PLN", "NOK", "CHF"],
+  "monthlyAdSpend": [
+    {"value": "1001", "label": "< USD 200/month"},
+    {"value": "1002", "label": "USD 200 - 1,000/month"},
+    {"value": "1003", "label": "USD 1,000 - 2,000/month"},
+    {"value": "1004", "label": "USD 2,000 - 5,000/month"},
+    {"value": "1005", "label": "USD 5,000 - 20,000/month"},
+    {"value": "1006", "label": "> USD 20,000/month"}
+  ],
+  "timezonesObserved": [
+    "(UTC+13:00) Apia",
+    "(UTC+12:00) Auckland", "(UTC+12:00) Majuro", "(UTC+12:00) Kamchatka",
+    "(UTC+11:00) Magadan",
+    "(UTC+10:00) Sydney", "(UTC+10:00) Vladivostok",
+    "(UTC+09:00) Broken Hill", "(UTC+09:00) Jayapura", "(UTC+09:00) Tokyo", "(UTC+09:00) Seoul", "(UTC+09:00) Yakutsk",
+    "(UTC+08:00) Perth", "(UTC+08:00) Shanghai", "(UTC+08:00) Hong Kong", "(UTC+08:00) Makassar", "(UTC+08:00) Kuala Lumpur", "(UTC+08:00) Manila", "(UTC+08:00) Irkutsk", "(UTC+08:00) Singapore", "(UTC+08:00) Taipei",
+    "(UTC+07:00) Jakarta", "(UTC+07:00) Krasnoyarsk", "(UTC+07:00) Bangkok", "(UTC+07:00) Phnom Penh", "(UTC+07:00) Ho Chi Minh",
+    "(UTC+06:00) Dhaka", "(UTC+06:00) Omsk",
+    "(UTC+05:30) Kolkata", "(UTC+05:30) Colombo",
+    "(UTC+05:00) Maldives", "(UTC+05:00) Karachi", "(UTC+05:00) Yekaterinburg", "(UTC+05:00) Aqtobe", "(UTC+05:00) Oral",
+    "(UTC+04:00) Dubai", "(UTC+04:00) Mauritius", "(UTC+04:00) Muscat", "(UTC+04:00) Samara",
+    "(UTC+03:00) Bahrain", "(UTC+03:00) Baghdad", "(UTC+03:00) Nairobi", "(UTC+03:00) Kuwait City", "(UTC+03:00) Doha", "(UTC+03:00) Moscow", "(UTC+03:00) Riyadh", "(UTC+03:00) Istanbul",
+    "(UTC+02:00) Sofia", "(UTC+02:00) Nicosia", "(UTC+02:00) Tallinn", "(UTC+02:00) Cairo", "(UTC+02:00) Helsinki", "(UTC+02:00) Athens", "(UTC+02:00) Jerusalem", "(UTC+02:00) Amman", "(UTC+02:00) Beirut", "(UTC+02:00) Vilnius", "(UTC+02:00) Riga", "(UTC+02:00) Gaza", "(UTC+02:00) Bucharest", "(UTC+02:00) Kaliningrad", "(UTC+02:00) Kyiv", "(UTC+02:00) Johannesburg",
+    "(UTC+01:00) Vienna", "(UTC+01:00) Sarajevo", "(UTC+01:00) Brussels", "(UTC+01:00) Zurich", "(UTC+01:00) Prague", "(UTC+01:00) Berlin", "(UTC+01:00) Copenhagen", "(UTC+01:00) Madrid", "(UTC+01:00) Paris", "(UTC+01:00) Zagreb", "(UTC+01:00) Budapest", "(UTC+01:00) Rome", "(UTC+01:00) Luxembourg", "(UTC+01:00) Skopje", "(UTC+01:00) Malta", "(UTC+01:00) Lagos", "(UTC+01:00) Amsterdam", "(UTC+01:00) Oslo", "(UTC+01:00) Warsaw", "(UTC+01:00) Belgrade", "(UTC+01:00) Stockholm", "(UTC+01:00) Ljubljana", "(UTC+01:00) Bratislava", "(UTC+01:00) Tunis", "(UTC+01:00) Dublin", "(UTC+01:00) Casablanca",
+    "(UTC+00:00) Canary Islands", "(UTC+00:00) London", "(UTC+00:00) Accra", "(UTC+00:00) Reykjavik", "(UTC+00:00) Lisbon",
+    "(UTC-01:00) Azores",
+    "(UTC-02:00) Fernando de Noronha",
+    "(UTC-03:00) San Luis", "(UTC-03:00) Buenos Aires", "(UTC-03:00) Salta", "(UTC-03:00) Belem", "(UTC-03:00) Sao Paulo", "(UTC-03:00) Montevideo",
+    "(UTC-04:00) Asuncion", "(UTC-04:00) St Johns", "(UTC-04:00) La Paz", "(UTC-04:00) Campo Grande", "(UTC-04:00) Blanc Sablon", "(UTC-04:00) Halifax", "(UTC-04:00) Santiago", "(UTC-04:00) Santo Domingo", "(UTC-04:00) San Juan", "(UTC-04:00) Port of Spain", "(UTC-04:00) Caracas",
+    "(UTC-05:00) New York", "(UTC-05:00) Nassau", "(UTC-05:00) Atikokan", "(UTC-05:00) Iqaluit", "(UTC-05:00) Toronto", "(UTC-05:00) Bogota", "(UTC-05:00) Guayaquil", "(UTC-05:00) Jamaica", "(UTC-05:00) Panama City", "(UTC-05:00) Lima",
+    "(UTC-06:00) Chicago", "(UTC-06:00) Rainy River", "(UTC-06:00) Regina", "(UTC-06:00) Easter", "(UTC-06:00) San Jose", "(UTC-06:00) Galapagos Islands", "(UTC-06:00) Guatemala City", "(UTC-06:00) Tegucigalpa", "(UTC-06:00) Mexico City", "(UTC-06:00) Managua", "(UTC-06:00) San Salvador",
+    "(UTC-07:00) Denver", "(UTC-07:00) Phoenix", "(UTC-07:00) Dawson Creek", "(UTC-07:00) Edmonton", "(UTC-07:00) Hermosillo", "(UTC-07:00) Mazatlan",
+    "(UTC-08:00) Los Angeles", "(UTC-08:00) Dawson City", "(UTC-08:00) Vancouver", "(UTC-08:00) Tijuana",
+    "(UTC-09:00) Anchorage",
+    "(UTC-10:00) Honolulu",
+    "(UTC-11:00) Midway", "(UTC-11:00) Niue", "(UTC-11:00) Pago Pago"
+  ],
+  "industry": {
+    "source": "/api/v3/bm/common/industry/info/sorted/?scene=1&version=400&levels=[1,2,3,4]",
+    "rule": "Fetch the full 1-4 level tree dynamically; labels and availability may vary by region/scene.",
+    "topAndSecondLevelObserved": {
+      "Apparel and accessories": ["Apparel and accessories", "Jewelry, bags, and accessories"],
+      "Apps and software": ["Business utility software", "Productivity and utility software", "Social software", "Web new category"],
+      "Automotive": ["Automotive dealer", "Automotive manufacturer", "Automotive marketplace e-commerce", "Automotive marketplace retail", "Other automobile"],
+      "Beauty and care": ["Care", "Cosmetics and makeup"],
+      "Consumer electronics and electrical appliances": ["Consumer electronics", "Electrical appliances"],
+      "Education": ["Interest or leisure related education", "Preschool to degree education", "Professional education"],
+      "Energy and chemicals": ["Chemicals", "Energy"],
+      "Entertainment and media": ["Movie and cinema", "Other entertainment and media", "Out-of-home entertainment", "Subscription and streaming"],
+      "Financial services": ["Fintech", "Traditional finance"],
+      "Food and beverage": ["Food and beverage", "Tobacco"],
+      "Gaming": ["Mobile gaming", "Non-mobile gaming"],
+      "Health products": ["Birth control and sexual health", "Healthcare supplement products", "Professional dental products"],
+      "Healthcare and pharmaceuticals": ["Hospitals and healthcare service providers", "Medical equipment", "Medtech", "Pharmaceutical manufacturer and biotechnology"],
+      "Industrial products and services": ["Franchising services", "Industrial electronics and electrical", "Industrial machinery equipment", "Other industrial products and services"],
+      "Lifestyle and home": ["Home décor", "Home improvement tools", "Sports, leisure, and hobbies", "Toy, kid, and pets"],
+      "Local and professional services": ["Dining and catering services", "Local services", "Professional services", "Real estate services"],
+      "Marketplace e-commerce": ["Comprehensive 2B marketplace e-commerce", "Comprehensive 2C marketplace e-commerce", "Other marketplace e-commerce", "Vertical 2B e-commerce", "Vertical 2C e-commerce"],
+      "Marketplace retail": ["Comprehensive 2B marketplace retail", "Comprehensive 2C marketplace retail", "Other marketplace retail", "Vertical 2B retail", "Vertical 2C retail"],
+      "Primary sectors": ["Agriculture and farming", "Animal husbandry", "Fishing", "Forestry", "Hunting", "Other primary sectors"],
+      "Public administration": ["Government and religious institution", "Non-profit organizations and NGO"],
+      "Regulated industries": ["Real money gaming", "Search arbitrage"],
+      "Telecommunication": ["Telecommunication"],
+      "Travel and transportation": ["Transportation", "Travel"]
+    },
+    "thirdLevelExample": {
+      "path": ["Travel and transportation", "Transportation"],
+      "children": ["Aircraft manufacturing", "Car rental services", "Car-hailing and chauffeur", "Courier and freight services", "Cruises", "Freight forwarding", "Logistics infrastructure", "Non-motor vehicle manufacturing", "Other logistics", "Other transportation", "Shipbuilders"]
+    }
+  }
+}

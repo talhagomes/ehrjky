@@ -1,0 +1,219 @@
+{
+  "generatedAt": "2026-10-25",
+  "source": "live-session-and-static-modules",
+  "evidenceFiles": [
+    "live-account-snapshot-2026-10-25.json",
+    "internal-api-catalog.json",
+    "mutation-test-log-2026-10-25.md"
+  ],
+  "policy": {
+    "preferred": ["official-api", "session-api", "hosted-ui", "dom-fallback"],
+    "neverStore": ["password", "session-cookie", "csrf-token", "full-card-number", "cvv"],
+    "confirmBefore": ["enable-delivery", "increase-budget", "submit-campaign", "upload-import", "payment-change"]
+  },
+  "capabilities": [
+    {
+      "id": "accounts.list",
+      "mode": "session-api",
+      "method": "GET",
+      "path": "/api/v2/i18n/account/account_switch_list/",
+      "verified": true,
+      "risk": "read"
+    },
+    {
+      "id": "campaigns.list",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v4/i18n/statistics/op/campaign/list/",
+      "verified": true,
+      "risk": "read"
+    },
+    {
+      "id": "adgroups.list",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v4/i18n/statistics/op/adgroup/list/",
+      "verified": true,
+      "risk": "read"
+    },
+    {
+      "id": "ads.list",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v4/i18n/statistics/op/ad/list/",
+      "verified": true,
+      "risk": "read"
+    },
+    {
+      "id": "campaign.name.update",
+      "mode": "hosted-ui-and-session-api",
+      "method": "POST_OR_UI",
+      "path": "/api/v3/i18n/overture/campaign/batch_update/name/",
+      "verified": true,
+      "verificationScope": "UI rename and restore verified; bulk endpoint contract discovered in bundle",
+      "risk": "metadata-change"
+    },
+    {
+      "id": "campaign.status",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v2/i18n/overture/campaign/update_status/",
+      "verified": false,
+      "risk": "delivery"
+    },
+    {
+      "id": "adgroup.status",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v3/i18n/overture/ad/update_status/",
+      "verified": false,
+      "risk": "delivery"
+    },
+    {
+      "id": "ad.status",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v2/i18n/overture/creative/update_status/",
+      "verified": false,
+      "risk": "delivery"
+    },
+    {
+      "id": "campaign.budget.check",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v3/i18n/overture/campaign/batch_update/budget/check/",
+      "verified": false,
+      "risk": "validate"
+    },
+    {
+      "id": "campaign.budget.update",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v3/i18n/overture/campaign/batch_update/budget/",
+      "verified": false,
+      "risk": "spend"
+    },
+    {
+      "id": "adgroup.budget.update",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v3/i18n/overture/ad/batch_update/budget/",
+      "verified": false,
+      "risk": "spend"
+    },
+    {
+      "id": "adgroup.bid.update",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v3/i18n/overture/ad/batch_update/bid/",
+      "verified": false,
+      "risk": "spend"
+    },
+    {
+      "id": "adgroup.schedule.update",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v3/i18n/overture/ad/batch_update/schedule/",
+      "verified": false,
+      "risk": "delivery"
+    },
+    {
+      "id": "appeal.submit",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v4/i18n/creation/audit/appeal_creative/",
+      "verified": true,
+      "risk": "submission"
+    },
+    {
+      "id": "rules.list",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v3/i18n/optimizer/rule/list/",
+      "verified": false,
+      "risk": "read"
+    },
+    {
+      "id": "rules.bind",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v3/i18n/optimizer/rule/batch_bind/",
+      "verified": false,
+      "risk": "automation"
+    },
+    {
+      "id": "meta-import.campaigns",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v4/i18n/creation/tool/import3p/campaign/list/",
+      "verified": false,
+      "risk": "read"
+    },
+    {
+      "id": "meta-import.submit",
+      "mode": "session-api",
+      "method": "POST",
+      "path": "/api/v4/i18n/creation/tool/import3p/campaign-import/submit/",
+      "verified": false,
+      "risk": "submission"
+    },
+    {
+      "id": "meta-import.job",
+      "mode": "session-api",
+      "method": "GET_OR_POST",
+      "path": "/api/v4/i18n/creation/tool/import3p/job/query/",
+      "verified": false,
+      "risk": "read"
+    },
+    {
+      "id": "billing.summary",
+      "mode": "dom-fallback",
+      "method": "READ",
+      "path": "/i18n/account/payment",
+      "verified": true,
+      "risk": "financial-read"
+    },
+    {
+      "id": "billing.payment-method",
+      "mode": "hosted-ui",
+      "method": "NAVIGATE",
+      "path": "/i18n/account/payment",
+      "verified": true,
+      "risk": "financial-change"
+    },
+    {
+      "id": "billing.payment-method.bind",
+      "mode": "dom-launch-hosted-submit",
+      "method": "SELECT_ACCOUNT_OPEN_FORM_SUBMIT_IN_TIKTOK",
+      "path": "/i18n/account/payment?aadvid={advertiser_id}",
+      "businessCenterPath": "https://business.tiktok.com/manage/financeRole?org_id={business_center_id}",
+      "verified": true,
+      "implementation": "background/billing + ui/views/billing.js",
+      "risk": "financial-change"
+    },
+    {
+      "id": "official.reporting",
+      "mode": "official-api",
+      "method": "GET",
+      "path": "/open_api/v2.0/report/integrated/get/",
+      "verified": false,
+      "risk": "read"
+    },
+    {
+      "id": "official.campaign-create",
+      "mode": "official-api",
+      "method": "POST",
+      "path": "/open_api/v1.3/campaign/create/",
+      "verified": false,
+      "risk": "submission"
+    },
+    {
+      "id": "official.smart-plus-create",
+      "mode": "official-api",
+      "method": "POST",
+      "path": "/open_api/v1.3/smart_plus/campaign/create/",
+      "verified": false,
+      "risk": "submission"
+    }
+  ]
+}

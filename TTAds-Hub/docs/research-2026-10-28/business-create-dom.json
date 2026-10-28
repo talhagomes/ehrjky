@@ -1,0 +1,185 @@
+{
+  "capturedAt": "2026-10-28",
+  "origin": "https://business.tiktok.com",
+  "entry": "/account/create?source=TTBC_HOME",
+  "framework": {
+    "componentSystem": "Keystone web components",
+    "observedTags": [
+      "ks-button-n2l5y1u4",
+      "ks-checkbox-xv7ohjev",
+      "ks-input-f27ggwv7",
+      "ks-input-selector-zdc24gch",
+      "ks-modal-*",
+      "ks-popover-*",
+      "ks-radio-6r41es07",
+      "ks-text-*"
+    ],
+    "warning": "Generated tag/class suffixes may change. Prefer labels, placeholders, section boundaries and stable host IDs."
+  },
+  "modes": [
+    {
+      "id": "advertiser",
+      "label": "Advertiser",
+      "default": true,
+      "steps": ["Company information", "Business Center information", "Advertiser Account information"],
+      "supportsFirstAdvertiserCreation": true
+    },
+    {
+      "id": "agency",
+      "label": "Agency",
+      "default": false,
+      "steps": ["Company information", "Business Center information"],
+      "supportsFirstAdvertiserCreation": false,
+      "observedRequiredFields": ["website", "country", "businessName", "bcName", "timezone", "tiktokBusinessTerms"]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "existing-company-new-bc-new-adv",
+      "recommendedForOneClick": true,
+      "sections": {
+        "company": {"choice": "Select existing", "selectionRule": "TikTok current/default or first offered Company"},
+        "businessCenter": {"choice": "Create new", "fields": ["bcName", "timezone", "currency"]},
+        "advertiser": {"fields": ["advertiserName", "advTimezone", "currency"]}
+      }
+    },
+    {
+      "id": "existing-company-existing-bc-new-adv",
+      "sections": {
+        "company": {"choice": "Select existing"},
+        "businessCenter": {"choice": "Select existing", "selectionKeys": ["businessCenterId", "businessCenterName"]},
+        "advertiser": {"fields": ["advertiserName", "advTimezone", "currency"]}
+      }
+    },
+    {
+      "id": "new-company-new-bc-new-adv",
+      "randomDataAllowed": false,
+      "reason": "Legal/contact data is used for invoices, tax and verification",
+      "fields": [
+        "website",
+        "country",
+        "businessName",
+        "industry",
+        "contactName",
+        "contactPhone",
+        "contactEmail",
+        "bcName",
+        "timezone",
+        "advertiserName",
+        "advTimezone",
+        "currency",
+        "monthlyAdSpend",
+        "tiktokBusinessTerms",
+        "betaTesterTerms"
+      ]
+    }
+  ],
+  "stableSelectors": {
+    "businessCenterName": "input[placeholder=\"Enter a name for your account\"]",
+    "advertiserName": "input[placeholder=\"Enter ad account name\"]",
+    "website": "input[placeholder=\"Business website or app download URL\"]",
+    "businessName": "input[placeholder=\"Enter your business name\"]",
+    "contactName": "input[placeholder=\"Contact name\"]",
+    "contactPhone": "input[placeholder=\"Enter phone number\"]",
+    "contactEmail": "input[placeholder=\"Please enter your email\"]",
+    "termsHost": "#tiktokBusinessTerms",
+    "betaHost": "#betaTesterTerms",
+    "submit": "visible enabled button with exact text Confirm"
+  },
+  "shadowDom": {
+    "checkboxes": [
+      {
+        "field": "tiktokBusinessTerms",
+        "hostId": "tiktokBusinessTerms",
+        "required": true,
+        "observedDefault": true,
+        "nativeSelectorInsideShadowRoot": "input[type=checkbox]",
+        "nativeClass": "checkbox__input",
+        "testId": "ks-checkbox-index-hCMjrk"
+      },
+      {
+        "field": "betaTesterTerms",
+        "hostId": "betaTesterTerms",
+        "required": false,
+        "observedDefault": false,
+        "automationPolicy": "force false"
+      }
+    ],
+    "nativeInput": {"class": "input", "observedTestId": "ks-input-index-gYhNPj"},
+    "nativeRadio": {"classPrefix": "radio radio--size-md", "observedTestId": "ks-radio-index-8AA75q", "id": "input"}
+  },
+  "canonicalFieldsFromBundle": [
+    {"name": "businessName", "purpose": "Company/legal business name"},
+    {"name": "bcName", "purpose": "Business Center display name"},
+    {"name": "bcCreateAdvCountry", "purpose": "Advertiser country selected during BC setup"},
+    {"name": "country", "purpose": "Company registered country/region"},
+    {"name": "timezone", "purpose": "Business Center timezone"},
+    {"name": "currency", "purpose": "Advertiser/billing currency"},
+    {"name": "businessLicense", "purpose": "Business license upload/reference"},
+    {"name": "businessLicenseNumber", "purpose": "Business license identifier"},
+    {"name": "additionalCertificate", "purpose": "Additional verification certificate"},
+    {"name": "website", "purpose": "Business website or app URL"},
+    {"name": "advertiserName", "purpose": "Advertiser account name"},
+    {"name": "industry", "purpose": "Industry hierarchy selection"},
+    {"name": "advTimezone", "purpose": "Advertiser timezone"},
+    {"name": "contactName", "purpose": "Business contact person"},
+    {"name": "contactPhone", "purpose": "Contact phone with country code"},
+    {"name": "contactEmail", "purpose": "Contact email"},
+    {"name": "tiktokBusinessTerms", "purpose": "Required TikTok Business terms acceptance"},
+    {"name": "betaTesterTerms", "purpose": "Optional beta tester terms"},
+    {"name": "withPlanningAgency", "purpose": "Planning agency association toggle"},
+    {"name": "planningAgencyCompany", "purpose": "Planning agency company"},
+    {"name": "bindSuperId", "purpose": "Internal entity binding"},
+    {"name": "bindCompany", "purpose": "Existing Company binding"},
+    {"name": "profileImage", "purpose": "Business profile image"},
+    {"name": "kaWebsite", "purpose": "Key-account website"},
+    {"name": "kaCurrency", "purpose": "Key-account currency"},
+    {"name": "emailForInvoice", "purpose": "Invoice email"},
+    {"name": "kaBusinessLicense", "purpose": "Key-account license"},
+    {"name": "kaBusinessLicenseNumber", "purpose": "Key-account license number"},
+    {"name": "kaAdditionalCertificate", "purpose": "Key-account additional certificate"},
+    {"name": "kaContactName", "purpose": "Key-account contact"},
+    {"name": "kaContactPhone", "purpose": "Key-account phone"},
+    {"name": "kaContactEmail", "purpose": "Key-account email"},
+    {"name": "billingAddress", "purpose": "Billing address"},
+    {"name": "postalCode", "purpose": "Billing postal code"},
+    {"name": "financeContactEmail", "purpose": "Finance contact"},
+    {"name": "paymentMethod", "purpose": "Selected payment method/type"},
+    {"name": "accountName", "purpose": "Payment/account display name"},
+    {"name": "description", "purpose": "Entity description"},
+    {"name": "reconObject", "purpose": "Reconciliation object"},
+    {"name": "billingGroupId", "purpose": "Billing group/portfolio relationship"},
+    {"name": "isPrimary", "purpose": "Primary payment/entity flag"},
+    {"name": "invoicePayer", "purpose": "Invoice payer"},
+    {"name": "geo_1", "purpose": "Address geography level 1"},
+    {"name": "geo_2", "purpose": "Address geography level 2"},
+    {"name": "geo_3", "purpose": "Address geography level 3"},
+    {"name": "geo_4", "purpose": "Address geography level 4"},
+    {"name": "taxType", "purpose": "Tax registration type"},
+    {"name": "monthlyAdSpend", "purpose": "Monthly spend bucket"},
+    {"name": "linkageStatus", "purpose": "Internal onboarding linkage state"},
+    {"name": "companyInfo", "purpose": "Internal Company aggregate"}
+  ],
+  "bundleEnums": {
+    "businessType": {"agency": "1", "advertiser": "2", "additional": ["agencyClient"]},
+    "scenarios": ["default", "businessProfile", "businessProfileDecoupled", "companySetup", "newbie", "standardBC", "linkageBC", "crmBC", "createAdvWithinBC", "paymentSetup", "landingPage", "promoteCnob"],
+    "sources": ["BC", "TTAM", "TTMS", "TTAM_HOME", "TTBC_HOME", "TTAM_SMB_NB_REGISTER", "BUSINESS_SUITE"],
+    "entities": ["company", "bc", "adv", "payment_method", "payment_account", "additional_info"]
+  },
+  "postSubmit": {
+    "successSignal": "location.pathname changes from /account/create",
+    "observedPath": "/account/payment-setup",
+    "queryFields": ["company_id", "adv_id", "bc_id", "form_id", "entry_point", "account_biz_type", "adv_name", "is_ka", "org_id", "source"],
+    "idFallbacks": {
+      "businessCenterId": ["org_id", "bc_id"],
+      "advertiserId": ["aadvid", "advertiser_id", "adv_id"]
+    }
+  },
+  "errorAndInterruptionSignals": [
+    "Protect your identity + verification code",
+    "captcha",
+    "verify you are human",
+    "security verification",
+    "visible role=alert/error-message/feedback"
+  ]
+}
