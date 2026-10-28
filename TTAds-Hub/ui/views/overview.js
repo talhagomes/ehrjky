@@ -325,7 +325,7 @@ export function mountOverview(root, ctx) {
     fill(toolbar,
       h('span', { class: 'section-label' }, 'Кабинеты'),
       h('span', { class: 'spacer' }),
-      S.data ? h('span', { class: 'hint', title: new Date(S.data.scannedAt).toLocaleString('ru-RU') }, S.loading ? 'обновляю…' : ago(S.data.scannedAt)) : null,
+      S.data ? h('span', { class: 'hint', title: `${new Date(S.data.scannedAt).toLocaleString('ru-RU')} · источник: внутренний API вашей вкладки Ads Manager` }, S.loading ? 'обновляю…' : ago(S.data.scannedAt)) : null,
       period,
       h('button', { class: 'icon-btn bordered', type: 'button', title: 'Обновить', 'aria-label': 'Обновить', disabled: S.loading, onclick: () => load({ force: true }) }, S.loading ? h('span', { class: 'spinner' }) : icon('refresh', 15)),
       h('div', { class: 'menu-anchor' }, h('button', { class: 'icon-btn', type: 'button', title: 'Экспорт', 'aria-label': 'Экспорт', 'aria-expanded': String(S.exportOpen), disabled: !S.data, onclick: () => { S.exportOpen = !S.exportOpen; renderToolbar(); } }, icon('download', 15)), exportMenu));

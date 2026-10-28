@@ -3,6 +3,7 @@
 import { ORIGIN } from '../lib/constants.js';
 import { HubError, wait } from '../lib/page.js';
 import { log } from '../lib/storage.js';
+import { VERSION } from '../lib/constants.js';
 import { ID_RE, LEVELS, matchEndpoint, collectIds, containsId, makeVariant, pickHeaders, detectNameSlot, detectBudgetSlot, hasBigNumbers } from './contract.js';
 import { getSession, setSession, patchSession, saveVariant, readRows, stateOf } from './store.js';
 
@@ -108,7 +109,7 @@ async function handleCapture(entry) {
     slot = found.slot;
   }
 
-  const variant = makeVariant({ endpoint: entry.endpoint, url: entry.url, body: entry.body, headers: entry.headers, aadvid, objectId: session.objectId, slot, label });
+  const variant = { ...makeVariant({ endpoint: entry.endpoint, url: entry.url, body: entry.body, headers: entry.headers, aadvid, objectId: session.objectId, slot, label }), extVersion: VERSION };
   const store = await saveVariant(variant, key);
   const done = session.kind !== 'status' || Boolean(store[expected]?.variants?.enable && store[expected]?.variants?.disable);
   const learned = session.kind === 'status' ? `«${label === 'enable' ? 'включить' : 'выключить'}»` : session.kind === 'name' ? 'имя' : 'бюджет';
