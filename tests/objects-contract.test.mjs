@@ -124,3 +124,31 @@ test('maskBody скрывает ID и текст, но оставляет enum-�
   const masked = maskBody({ campaign_ids: [OBJ], opt_status: 2, status: 'DISABLE', name: 'Моя кампания для клиента', map: { [OBJ]: { v: 1500000 } } });
   assert.deepEqual(masked, { campaign_ids: ['<id>'], opt_status: 2, status: 'DISABLE', name: '<str>', map: { '<id>': { v: '<num>' } } });
 });
+
+test('контракты: срок жизни, отключение и откуда берётся вариант', async () => {
+  const { contractInfo, contractStates, locate, CONTRACT_STALE_MS } = await import('../TTAds-Hub/background/objects/contract.js');
+  const now = 10 * 24 * 3600 * 1000 * 10;
+  const fresh = { at: now - 2 * 24 * 3600 * 1000 };
+  const old = { at: now - CONTRACT_STALE_MS - 1000 };
+  const store = {
+    'campaign.status': { variants: { disable: fresh, enable: { ...fresh, invalid: { at: now - 1000, reason: 'schema' } } } },
+    'campaign.name': { variants: { set: old } }
+  };
+  assert.deepEqual(locate('adgroup', 'budget'), { endpoint: 'adgroup.budget', key: 'set' });
+  assert.deepEqual(locate('ad', 'enable'), { endpoint: 'ad.status', key: 'enable' });
+  assert.equal(locate('campaign', 'delete'), null);
+  assert.deepEqual(contractInfo(store, 'campaign', 'disable', now), { state: 'ready', learnedAt: fresh.at, ageDays: 2 });
+  assert.equal(contractInfo(store, 'campaign', 'rename', now).state, 'stale');
+  assert.equal(contractInfo(store, 'campaign', 'rename', now).ageDays, 14);
+  assert.deepEqual(contractInfo(store, 'campaign', 'enable', now), { state: 'invalid', reason: 'schema', at: now - 1000, learnedAt: fresh.at });
+  assert.equal(contractInfo(store, 'campaign', 'budget', now).state, 'missing');
+  // устаревший контракт работает, отключённый — нет
+  assert.equal(variantFor(store, 'campaign', 'rename'), old);
+  assert.equal(variantFor(store, 'campaign', 'enable'), null);
+  assert.equal(readiness(store).campaign.enable, false);
+  assert.equal(readiness(store).campaign.disable, true);
+  const states = contractStates(store, now);
+  assert.deepEqual(Object.keys(states), ['campaign', 'adgroup', 'ad']);
+  assert.equal(states.campaign.rename.state, 'stale');
+  assert.equal(states.ad.disable.state, 'missing');
+});
