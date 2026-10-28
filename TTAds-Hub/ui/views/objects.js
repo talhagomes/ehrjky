@@ -6,6 +6,8 @@ import { openSheet, closeSheet } from '../lib/sheet.js';
 import * as bus from '../lib/bus.js';
 import { money } from '../lib/format.js';
 import { LINK_BY_ID, resolveLink } from '../../background/links/catalog.js';
+import { ERROR_KINDS } from '../../background/lib/errors.js';
+import { INVALID_REASONS } from '../../background/objects/contract.js';
 
 const LEVELS = [['campaign', 'Кампании'], ['adgroup', 'Адсеты'], ['ad', 'Объявления']];
 const ACTIONS = [['disable', 'Выключить'], ['enable', 'Включить'], ['rename', 'Имя'], ['budget', 'Бюджет']];
@@ -15,6 +17,15 @@ const KIND_OF = { disable: 'status', enable: 'status', rename: 'name', budget: '
 const RESULT_TITLE = { disable: 'Выключение', enable: 'Включение', rename: 'Переименование', budget: 'Бюджет' };
 const JOB_STATE = { running: ['выполняется…', 'info'], complete: ['готово', 'ok'], partial: ['частично', 'warn'], error: ['не удалось', 'err'], cancelled: ['остановлено', 'warn'], interrupted: ['прервано', 'warn'] };
 const readyKey = (action) => (action === 'rename' ? 'name' : action === 'budget' ? 'budget' : action);
+const ACTION_OF_KEY = { disable: 'disable', enable: 'enable', name: 'rename', budget: 'budget' };
+
+// Метка состояния обученного действия: ✓ готово, ✓ + возраст (устарело), ⚠ отключено, ○ не обучено.
+function contractPill(label, info) {
+  if (!info || info.state === 'missing') return h('span', { class: 'pill' }, `${label} ○`);
+  if (info.state === 'invalid') return h('span', { class: 'pill err', title: `Отключено: ${INVALID_REASONS[info.reason] || 'TikTok изменил запрос'}. Обучите заново.` }, `${label} ⚠`);
+  if (info.state === 'stale') return h('span', { class: 'pill warn', title: `Обучено ${info.ageDays} дн. назад: если действие не сработает, обучите заново.` }, `${label} ✓ ${info.ageDays} дн.`);
+  return h('span', { class: 'pill ok', title: `Обучено ${info.ageDays || 0} дн. назад` }, `${label} ✓`);
+}
 
 const stateWord = (value) => (value === true ? 'включено' : value === false ? 'выключено' : '—');
 const change = (action, before, after, currency) => (action === 'rename' ? `${before.name} → ${after.name}`
@@ -68,7 +79,7 @@ export function openLearnSheet(ctx, { account = '', level = 'campaign', kind = '
   function render() {
     const session = L.status?.session;
     const live = session && ['waiting', 'checking'].includes(session.state);
-    const ready = L.status?.ready?.[L.level] || {};
+    const states = L.status?.contracts?.[L.level] || {};
     const kinds = [['status', 'Вкл/выкл'], ['name', 'Имя'], ...(L.level === 'ad' ? [] : [['budget', 'Бюджет']])];
     if (!kinds.some(([id]) => id === L.kind)) L.kind = 'status';
     const accountSelect = h('select', { class: 'select', disabled: live, 'aria-label': 'Кабинет' }, (accounts.length ? accounts : [{ id: L.account, name: L.account }]).map((a) => h('option', { value: a.id, selected: a.id === L.account }, `${a.name} · …${a.id.slice(-6)}`)));
@@ -85,8 +96,7 @@ export function openLearnSheet(ctx, { account = '', level = 'campaign', kind = '
       h('div', { class: 'seg', role: 'group', 'aria-label': 'Уровень' }, LEVELS.map(([id, title]) => h('button', { type: 'button', disabled: live, 'aria-pressed': String(L.level === id), onclick: () => { L.level = id; L.rows = null; L.objectId = ''; loadRows(); } }, title))),
       h('div', { class: 'seg', role: 'group', 'aria-label': 'Что обучаем' }, kinds.map(([id, title]) => h('button', { type: 'button', disabled: live, 'aria-pressed': String(L.kind === id), onclick: () => { L.kind = id; render(); } }, title))),
       h('div', { class: 'row wrap' },
-        h('span', { class: `pill ${ready.disable ? 'ok' : ''}` }, `Выкл ${ready.disable ? '✓' : '○'}`), h('span', { class: `pill ${ready.enable ? 'ok' : ''}` }, `Вкл ${ready.enable ? '✓' : '○'}`),
-        h('span', { class: `pill ${ready.name ? 'ok' : ''}` }, `Имя ${ready.name ? '✓' : '○'}`), L.level === 'ad' ? null : h('span', { class: `pill ${ready.budget ? 'ok' : ''}` }, `Бюджет ${ready.budget ? '✓' : '○'}`)),
+        contractPill('Выкл', states.disable), contractPill('Вкл', states.enable), contractPill('Имя', states.rename), L.level === 'ad' ? null : contractPill('Бюджет', states.budget)),
       h('label', { class: 'field' }, h('span', { class: 'label' }, 'Кабинет'), accountSelect),
       h('label', { class: 'field' }, h('div', { class: 'row' }, h('span', { class: 'label' }, 'Тестовый объект'), h('span', { class: 'spacer' }), h('button', { class: 'linklike', type: 'button', disabled: live || L.loading, onclick: loadRows }, L.rows ? 'обновить' : 'загрузить')), L.loading ? h('div', { class: 'row hint' }, h('span', { class: 'spinner' }), 'Читаю объекты…') : objectSelect,
         h('span', { class: 'hint' }, 'Выберите объект, который не страшно переключить: после обучения состояние можно вернуть тем же действием.')),
@@ -124,6 +134,7 @@ export function openObjectsSheet(ctx, { accounts = [], level = 'campaign', actio
   let stopped = false;
 
   const ready = () => Boolean(S.status?.ready?.[S.level]?.[readyKey(S.action)]);
+  const contract = () => S.status?.contracts?.[S.level]?.[S.action] || { state: 'missing' };
   const risky = () => S.action === 'enable' || S.action === 'budget';
   const input = () => ({
     action: S.action, level: S.level, accounts: accounts.map((a) => a.id), ids: ids || undefined, filter: { state: S.state, q: S.q },
@@ -172,14 +183,19 @@ export function openObjectsSheet(ctx, { accounts = [], level = 'campaign', actio
     if (!job) return null;
     const [label, tone] = JOB_STATE[job.state] || [job.state, 'info'];
     const running = job.state === 'running';
-    const problems = [...new Set((job.items || []).filter((item) => item.request && !item.request.ok).map((item) => [item.request.http, item.request.code, item.request.msg].filter((v) => v !== null && v !== '').join(' ')))].filter(Boolean).slice(0, 3);
+    const failedItems = (job.items || []).filter((item) => item.request && !item.request.ok && !item.request.skipped);
+    const problems = [...new Set(failedItems.map((item) => [ERROR_KINDS[item.request.kind]?.label, item.request.http, item.request.code, item.request.msg].filter((v) => v !== null && v !== undefined && v !== '').join(' · ')))].filter(Boolean).slice(0, 3);
+    const late = (job.items || []).filter((item) => item.request?.late).length;
+    const retried = (job.items || []).reduce((sum, item) => sum + Math.max(0, (item.request?.tries || 1) - 1), 0);
     const unverified = (job.items || []).filter((item) => item.request?.ok && item.verified === false).length;
     return h('div', { class: `alert ${tone}` }, icon(tone === 'ok' ? 'check' : tone === 'info' ? 'info' : 'alert', 15), h('div', { class: 'grow' },
       h('b', null, `${RESULT_TITLE[job.action]}${job.rollbackOf ? ' (откат)' : ''}: ${label}`),
       running ? h('div', { class: `progress${job.done ? '' : ' indeterminate'}` }, h('i', { style: { width: `${job.total ? Math.round((job.done / job.total) * 100) : 0}%` } })) : null,
       h('p', { class: 'small' }, `Запросов: ${job.done} из ${job.total}${job.phase === 'verify' ? ' · проверяю повторным чтением…' : ''}`),
       job.verified !== undefined ? h('p', { class: 'small' }, `Подтверждено повторным чтением: ${job.verified} из ${job.total}`) : null,
-      unverified ? h('p', { class: 'small' }, `TikTok ответил «ок», но изменение пока не видно у ${unverified} — обновите список позже.`) : null,
+      unverified && !job.invalidated ? h('p', { class: 'small' }, `TikTok ответил «ок», но изменение пока не видно у ${unverified} — обновите список позже.`) : null,
+      late ? h('p', { class: 'small' }, `У ${late} запрос не получил ответ, но повторное чтение показало, что изменение применилось.`) : null,
+      retried ? h('p', { class: 'small muted' }, `Повторных запросов после сбоев: ${retried}.`) : null,
       problems.map((text) => h('p', { class: 'small err-text' }, text)),
       job.error ? h('p', { class: 'small err-text' }, job.error) : null,
       job.note ? h('p', { class: 'small muted' }, job.note) : null,
@@ -216,14 +232,17 @@ export function openObjectsSheet(ctx, { accounts = [], level = 'campaign', actio
       lockLevel ? null : h('div', { class: 'seg', role: 'group', 'aria-label': 'Уровень' }, LEVELS.map(([id, title]) => h('button', { type: 'button', 'aria-pressed': String(S.level === id), onclick: () => select({ level: id }) }, title))),
       h('div', { class: 'seg', role: 'group', 'aria-label': 'Действие' }, kinds.map(([id, title]) => h('button', { type: 'button', 'aria-pressed': String(S.action === id), onclick: () => select({ action: id, state: ids ? 'all' : id === 'enable' ? 'disabled' : id === 'disable' ? 'enabled' : 'all' }) }, title))),
       S.status && !ready() ? h('div', { class: 'alert warn' }, icon('alert', 15), h('div', { class: 'grow' },
-        h('b', null, 'Действие ещё не обучено'),
-        h('p', { class: 'small' }, 'Выполните его один раз в TikTok на тестовом объекте — расширение запомнит запрос и подтвердит результат.'),
+        h('b', null, contract().state === 'invalid' ? 'Запомненное действие отключено' : 'Действие ещё не обучено'),
+        h('p', { class: 'small' }, contract().state === 'invalid'
+          ? `${INVALID_REASONS[contract().reason] || 'TikTok изменил запрос'}. Выполните действие в TikTok на тестовом объекте ещё раз — расширение запомнит новый запрос.`
+          : 'Выполните его один раз в TikTok на тестовом объекте — расширение запомнит запрос и подтвердит результат.'),
         h('button', { class: 'btn sm primary', type: 'button', onclick: () => openLearnSheet(ctx, { account: accounts[0]?.id, level: S.level, kind: learnKind, onClose: reopen }) }, icon('play', 13), 'Обучить'))) : null,
       ids ? null : h('div', { class: 'row wrap' }, h('div', { style: { flex: '1', minWidth: '150px' } }, stateSelect), h('div', { style: { flex: '1', minWidth: '130px' } }, qInput)),
       S.action === 'rename' ? h('label', { class: 'field' }, h('span', { class: 'label' }, 'Новое имя (шаблон)'), nameInput, h('span', { class: 'hint' }, '{name} — прежнее имя, {n} — номер в кабинете, {date} — ММДД')) : null,
       S.action === 'budget' ? h('div', { class: 'field' }, h('span', { class: 'label' }, 'Бюджет'),
         h('div', { class: 'row' }, h('div', { class: 'seg', role: 'group', 'aria-label': 'Способ' }, [['multiply', '× коэффициент'], ['set', 'Задать']].map(([id, title]) => h('button', { type: 'button', 'aria-pressed': String(S.budgetMode === id), onclick: () => { S.budgetMode = id; S.plan = null; render(); } }, title))), budgetInput),
         h('span', { class: 'hint' }, 'Объекты без собственного бюджета (например, при CBO) пропускаются. По правилам TikTok новый бюджет не может быть ниже ~105% уже потраченного — такой запрос он отклонит.')) : null,
+      ready() && contract().state === 'stale' ? h('p', { class: 'hint' }, `Действие обучено ${contract().ageDays} дн. назад. TikTok мог изменить запрос: результат проверяется повторным чтением, при сбое действие отключится само.`) : null,
       planBlock(), jobBlock());
     renderFoot();
   }

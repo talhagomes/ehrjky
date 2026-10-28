@@ -1,6 +1,7 @@
 import { h, toast, fill } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import * as bus from '../lib/bus.js';
+import { sunsetNotice } from '../../background/lib/sunset.js';
 
 const GOAL = { app: 'App Promotion', lead: 'Lead Generation', sales: 'Sales' };
 const HERO_ICON = { idle: 'target', ready: 'zap', working: 'refresh', done: 'check', error: 'alert' };
@@ -21,7 +22,9 @@ export function mountManual(root, ctx) {
   const hero = h('section', { class: 'card hero' });
   const steps = h('section', { class: 'card' });
   const mnl = h('section', { class: 'card' });
+  const sunset = sunsetNotice();
   root.append(h('div', { class: 'stack' }, hero, steps, mnl,
+    h('div', { class: `alert ${sunset.kind}`, role: 'note' }, icon('info', 15), h('div', null, sunset.text)),
     h('p', { class: 'hint', style: { textAlign: 'center' } }, 'Только черновик: публикацию кампании расширение не выполняет.')));
 
   const stopTab = ctx.onTab(() => { status = null; loadError = ''; local.error = ''; lastSig = ''; poll(); });
