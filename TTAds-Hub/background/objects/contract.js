@@ -76,6 +76,9 @@ export function walk(value, visit, path = []) {
   }
 }
 
+// Целые числа длиннее 15 цифр вне строк (ID как числа JSON): JSON.parse округляет их, и повтор запроса исказил бы значение.
+export const hasBigNumbers = (text) => /-?\d{16,}/.test(String(text ?? '').replace(/"(?:[^"\\]|\\.)*"/g, '""'));
+
 // Все ID-подобные строки тела (значения и ключи карт): по ним понимаем, сколько объектов затронул запрос.
 export function collectIds(body) {
   const found = new Set();

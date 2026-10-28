@@ -65,12 +65,14 @@ export function moneyAfterLabel(text, label, window = 90) {
 
 /* ---------- статус рекламного кабинета ---------- */
 
-// Порядок важен: «Not approved» содержит «approved», «Disabled» — «enabled».
+// Порядок важен: «Not approved» содержит «approved», «Disabled» — «enabled». Текст нормализуется (нижний регистр, «_» → пробел),
+// поэтому одни и те же правила понимают подписи интерфейса («Not approved») и перечисления API (STATUS_CONFIRM_FAIL,
+// SHOW_ACCOUNT_STATUS_IN_REVIEW, CONTRACT_INACTIVE).
 const STATUS_RULES = [
-  ['suspended', 'Заблокирован', /suspend|\bdisabled?\b|\bban(?:ned)?\b|deactivat|restrict|frozen|closed|punish|STATUS_LIMIT|STATUS_DISABLE|заблок|приостанов|отключ/i],
-  ['rejected', 'Отклонён', /not approved|reject|review failed|denied|CONFIRM_FAIL|отклон|не одобрен/i],
-  ['review', 'На проверке', /in review|under review|pending|reviewing|awaiting|STATUS_PENDING|WAIT_FOR|UNAUDITED|CONTRACT_PENDING|на проверке|на рассмотрении|ожида/i],
-  ['active', 'Активен', /approved|\bactive\b|\benabled?\b|STATUS_ENABLE|одобрен|активен/i]
+  ['suspended', /suspend|disabled?|\bban(?:ned)?\b|deactivat|restrict|frozen|closed|punish|status limit|(?<!contract )inactive|заблок|приостанов|отключ/],
+  ['rejected', /not approved|reject|review failed|denied|confirm fail|modify fail|отклон|не одобрен/],
+  ['review', /in review|under review|pending|reviewing|awaiting|wait for|unaudited|contract inactive|на проверке|на рассмотрении|ожида/],
+  ['active', /approved|active|enabled?|одобрен|активен/]
 ];
 
 export const STATUS_KINDS = Object.freeze({
@@ -80,7 +82,8 @@ export const STATUS_KINDS = Object.freeze({
 export function classifyAccountStatus(raw) {
   const text = clean(raw);
   if (!text) return { kind: 'unknown', label: STATUS_KINDS.unknown[0], text: '' };
-  for (const [kind, label, re] of STATUS_RULES) if (re.test(text)) return { kind, label, text: text.slice(0, 80) };
+  const normalized = text.toLowerCase().replace(/_/g, ' ');
+  for (const [kind, re] of STATUS_RULES) if (re.test(normalized)) return { kind, label: STATUS_KINDS[kind][0], text: text.slice(0, 80) };
   return { kind: 'unknown', label: STATUS_KINDS.unknown[0], text: text.slice(0, 80) };
 }
 

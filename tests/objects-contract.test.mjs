@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   matchEndpoint, sanitizeBody, sanitizeQuery, pickHeaders, substitute, containsId, makeVariant, buildRequest, detectNameSlot, detectBudgetSlot,
-  formatBudget, readiness, variantFor, renderName, budgetAfter, maskBody, setAt, splitRisk, collectIds
+  formatBudget, readiness, variantFor, renderName, budgetAfter, maskBody, setAt, splitRisk, collectIds, hasBigNumbers
 } from '../TTAds-Hub/background/objects/contract.js';
 
 const URL_BASE = 'https://ads.tiktok.com';
@@ -87,6 +87,16 @@ test('числовые ID в теле не находятся — контрак
   assert.deepEqual(substitute({ [OBJ]: [OBJ, 'x'], n: 5 }, new Map([[OBJ, OTHER]])), { [OTHER]: [OTHER, 'x'], n: 5 });
   assert.equal(setAt({ a: 1 }, ['b'], 2), false);
   assert.deepEqual([...collectIds({ ids: [OBJ, OTHER], map: { [ACC1]: 1 }, n: 'x', short: '123' })].sort(), [ACC1, OBJ, OTHER].sort());
+});
+
+test('hasBigNumbers: длинные числа вне строк опасны, внутри строк — нет', () => {
+  assert.equal(hasBigNumbers(`{"campaign_ids":["${OBJ}"],"opt_status":2}`), false);
+  assert.equal(hasBigNumbers(`{"campaign_ids":[${OBJ}],"opt_status":2}`), true);
+  assert.equal(hasBigNumbers('{"pixel_id":7700100000000000001}'), true);
+  assert.equal(hasBigNumbers('{"v":-1234567890123456789}'), true);
+  assert.equal(hasBigNumbers('{"name":"a \\"1234567890123456789\\" b","n":12345,"f":1.5}'), false);
+  assert.equal(hasBigNumbers('{"budget":123456789012345}'), false);
+  assert.equal(hasBigNumbers(''), false);
 });
 
 test('readiness / variantFor', () => {

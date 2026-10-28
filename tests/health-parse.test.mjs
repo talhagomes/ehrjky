@@ -30,6 +30,18 @@ test('classifyAccountStatus: порядок правил', () => {
   assert.equal(classifyAccountStatus('').kind, 'unknown');
 });
 
+test('classifyAccountStatus: перечисления официального API (STATUS_*, SHOW_ACCOUNT_STATUS_*)', () => {
+  const kinds = {
+    STATUS_ENABLE: 'active', STATUS_DISABLE: 'suspended', STATUS_LIMIT: 'suspended',
+    STATUS_PENDING_CONFIRM: 'review', STATUS_PENDING_VERIFIED: 'review', STATUS_PENDING_CONFIRM_MODIFY: 'review', STATUS_WAIT_FOR_BPM_AUDIT: 'review',
+    STATUS_WAIT_FOR_PUBLIC_AUTH: 'review', STATUS_SELF_SERVICE_UNAUDITED: 'review', STATUS_CONTRACT_PENDING: 'review',
+    STATUS_CONFIRM_FAIL: 'rejected', STATUS_CONFIRM_FAIL_END: 'rejected', STATUS_CONFIRM_MODIFY_FAIL: 'rejected',
+    SHOW_ACCOUNT_STATUS_APPROVED: 'active', SHOW_ACCOUNT_STATUS_NOT_APPROVED: 'rejected', SHOW_ACCOUNT_STATUS_IN_REVIEW: 'review', SHOW_ACCOUNT_STATUS_PUNISHED: 'suspended',
+    SUSPENDED: 'suspended', DISABLED: 'suspended', CONTRACT_INACTIVE: 'review', INACTIVE: 'suspended'
+  };
+  for (const [raw, kind] of Object.entries(kinds)) assert.equal(classifyAccountStatus(raw).kind, kind, raw);
+});
+
 test('parseCards: маска, бренд, срок, валюта', () => {
   const cards = parseCards('Payment methods Visa **** **** **** 4242 EUR Expiry date 01/30 Primary Add a payment method');
   assert.equal(cards.length, 1);

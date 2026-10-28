@@ -223,7 +223,7 @@ export function openObjectsSheet(ctx, { accounts = [], level = 'campaign', actio
       S.action === 'rename' ? h('label', { class: 'field' }, h('span', { class: 'label' }, 'Новое имя (шаблон)'), nameInput, h('span', { class: 'hint' }, '{name} — прежнее имя, {n} — номер в кабинете, {date} — ММДД')) : null,
       S.action === 'budget' ? h('div', { class: 'field' }, h('span', { class: 'label' }, 'Бюджет'),
         h('div', { class: 'row' }, h('div', { class: 'seg', role: 'group', 'aria-label': 'Способ' }, [['multiply', '× коэффициент'], ['set', 'Задать']].map(([id, title]) => h('button', { type: 'button', 'aria-pressed': String(S.budgetMode === id), onclick: () => { S.budgetMode = id; S.plan = null; render(); } }, title))), budgetInput),
-        h('span', { class: 'hint' }, 'Объекты без собственного бюджета (например, при CBO) пропускаются.')) : null,
+        h('span', { class: 'hint' }, 'Объекты без собственного бюджета (например, при CBO) пропускаются. По правилам TikTok новый бюджет не может быть ниже ~105% уже потраченного — такой запрос он отклонит.')) : null,
       planBlock(), jobBlock());
     renderFoot();
   }

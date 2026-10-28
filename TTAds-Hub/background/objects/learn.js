@@ -3,16 +3,24 @@
 import { ORIGIN } from '../lib/constants.js';
 import { HubError, wait } from '../lib/page.js';
 import { log } from '../lib/storage.js';
-import { ID_RE, LEVELS, matchEndpoint, collectIds, containsId, makeVariant, pickHeaders, detectNameSlot, detectBudgetSlot } from './contract.js';
+import { ID_RE, LEVELS, matchEndpoint, collectIds, containsId, makeVariant, pickHeaders, detectNameSlot, detectBudgetSlot, hasBigNumbers } from './contract.js';
 import { getSession, setSession, patchSession, saveVariant, readRows, stateOf } from './store.js';
 
 const SESSION_TTL = 10 * 60 * 1000;
 const KINDS = ['status', 'name', 'budget'];
 const pending = new Map();
 
+// Байты частей склеиваются до декодирования: многобайтовый символ мог разорваться между частями.
 function decodeBody(requestBody) {
   try {
-    if (requestBody?.raw?.length) return JSON.parse(requestBody.raw.map((part) => new TextDecoder().decode(part.bytes)).join(''));
+    if (requestBody?.raw?.length) {
+      const parts = requestBody.raw.map((part) => new Uint8Array(part.bytes));
+      const merged = new Uint8Array(parts.reduce((sum, bytes) => sum + bytes.length, 0));
+      let offset = 0;
+      for (const bytes of parts) { merged.set(bytes, offset); offset += bytes.length; }
+      const text = new TextDecoder().decode(merged);
+      return { body: JSON.parse(text), bigNumbers: hasBigNumbers(text) };
+    }
   } catch { /* не JSON — не наш запрос */ }
   return null;
 }
@@ -22,9 +30,9 @@ function onBefore(details) {
   let url;
   try { url = new URL(details.url); } catch { return; }
   const endpoint = matchEndpoint(url.pathname);
-  const body = endpoint ? decodeBody(details.requestBody) : null;
-  if (!body || typeof body !== 'object') return;
-  pending.set(details.requestId, { endpoint, url: url.href, tabId: details.tabId, body, headers: {}, at: Date.now() });
+  const decoded = endpoint ? decodeBody(details.requestBody) : null;
+  if (!decoded?.body || typeof decoded.body !== 'object') return;
+  pending.set(details.requestId, { endpoint, url: url.href, tabId: details.tabId, body: decoded.body, bigNumbers: decoded.bigNumbers, headers: {}, at: Date.now() });
   if (pending.size > 40) for (const [id, entry] of pending) if (Date.now() - entry.at > 60000) pending.delete(id);
 }
 
@@ -61,6 +69,7 @@ async function handleCapture(entry) {
     await fail(`TikTok отправил другой запрос (${url.pathname}), а ожидался «${expected}». Выполните действие в указанном месте или пришлите диагностику.`, { other: [...(session.other || []), url.pathname].slice(-5) });
     return;
   }
+  if (entry.bigNumbers) return void await fail('В запросе ID записаны числами без кавычек: JavaScript теряет в них точность, и повторить такой запрос безопасно нельзя. Пришлите диагностику.');
   const aadvid = url.searchParams.get('aadvid') || session.account;
   if (aadvid !== session.account) return void await fail('Действие выполнено в другом кабинете — повторите в выбранном.');
   if (!containsId(entry.body, session.objectId)) return void await fail(`В запросе нет объекта «${session.objectName}». Измените именно его.`);
