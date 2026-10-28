@@ -163,7 +163,7 @@ const handlers = {
 };
 
 // Хуки для автотестов: позволяют проверить omnibox и мониторинг без реального ввода в адресную строку и ожидания таймера.
-globalThis.__tth = { omnibox: { suggestFor, enter: omniboxEnter, currentContext }, monitor, accounts, overview, health };
+globalThis.__tth = { omnibox: { suggestFor, enter: omniboxEnter, currentContext }, monitor, accounts, overview, health, objects };
 
 // Токен-бакет: не больше ~1 записи MNL в секунду (всплеск до 60), чтобы страница не вытеснила журнал.
 const mnlBucket = { tokens: 60, at: Date.now() };
